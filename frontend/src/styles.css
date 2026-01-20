@@ -1,0 +1,36 @@
+:root{
+  --bg:#071129;
+  --card:#0b1a2b;
+  --accent:#3b82f6;
+  --muted:rgba(255,255,255,0.65);
+  --glass: rgba(255,255,255,0.03);
+  --glass-2: rgba(255,255,255,0.02);
+  --radius:14px;
+  --mono: Inter, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+}
+*{box-sizing:border-box;font-family:var(--mono);color:#eaf3ff}
+body{margin:0;min-height:100vh;background:
+  radial-gradient(900px 400px at 10% 10%, rgba(59,130,246,0.08), transparent),
+  linear-gradient(180deg,var(--bg), #041022);display:flex;flex-direction:column;align-items:stretch;}
+.hero{padding:28px 24px;background:linear-gradient(90deg,rgba(255,255,255,0.02),transparent);border-bottom:1px solid var(--glass-2)}
+.hero-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:20px}
+.brand{margin:0;font-size:22px;font-weight:800;letter-spacing:0.4px}
+.tag{margin:0;color:var(--muted);font-size:14px}
+.nav ul{display:flex;gap:12px;list-style:none;padding:0;margin:0;align-items:center}
+.nav-item{padding:8px 12px;border-radius:10px;color:var(--muted);cursor:pointer;transition:background .15s, transform .12s}
+.nav-item:hover{background:var(--glass);transform:translateY(-2px);color:#fff}
+.nav-item.active{background:linear-gradient(90deg,var(--accent),#60a5fa);color:#012}
+.container{max-width:1100px;margin:26px auto;padding:0 18px;flex:1;display:grid;grid-template-columns:1fr 420px;gap:18px}
+.card{background:linear-gradient(180deg,var(--glass),transparent);padding:18px;border-radius:var(--radius);box-shadow:0 8px 30px rgba(2,6,23,0.6)}
+.target{width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:inherit;outline:none;font-size:15px}
+.controls{display:flex;gap:10px;margin-top:12px;align-items:center;flex-wrap:wrap}
+button{background:linear-gradient(90deg,var(--accent),#60a5fa);border:none;color:#012;padding:9px 12px;border-radius:10px;font-weight:700;cursor:pointer;transition:transform .12s,opacity .12s}
+button:hover{transform:translateY(-3px)}
+.chk{color:var(--muted);display:inline-flex;align-items:center;gap:8px}
+.results pre{white-space:pre-wrap;word-break:break-word;margin:0;background:transparent;border:none;color:#eaf3ff;font-size:13px}
+.footer{text-align:center;padding:18px;color:var(--muted);font-size:13px}
+
+/* responsive */
+@media (max-width:900px){
+  .container{grid-template-columns:1fr; padding:16px}
+}

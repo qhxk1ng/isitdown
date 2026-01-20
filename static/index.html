@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>isitdown.space</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body>
+    <main class="container">
+      <h1 class="logo">isitdown.space</h1>
+      <p class="subtitle">Quickly check if a website, server, or endpoint is up.</p>
+
+      <div class="card">
+        <input id="target" placeholder="https://example.com or example.com:80" />
+        <div class="buttons">
+          <button id="btn-http">HTTP</button>
+          <button id="btn-port">Port</button>
+          <button id="btn-nmap">Nmap (service check)</button>
+        </div>
+        <label><input type="checkbox" id="verbose"> Verbose</label>
+      </div>
+
+      <div class="results card">
+        <pre id="output">Results will appear here...</pre>
+      </div>
+
+      <footer>Built with FastAPI · No auth · Limited scans</footer>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>
