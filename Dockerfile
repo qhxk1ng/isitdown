@@ -15,8 +15,10 @@ FROM python:3.11-slim
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1
 
-# Install system deps for nmap if desired (commented out)
-# RUN apt-get update && apt-get install -y nmap && rm -rf /var/lib/apt/lists/*
+# Install system deps for nmap so /api/nmap works in the container
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends nmap \
+ && rm -rf /var/lib/apt/lists/*
 
 # Copy python requirements and app
 COPY requirements.txt .

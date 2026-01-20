@@ -12,10 +12,6 @@ from typing import Optional
 
 app = FastAPI(title="isitdown.space API")
 
-# Serve built React frontend (vite build output)
-# During development you can still serve the simple static files or point to frontend/dist after building
-app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="static")
-
 # Simple in-memory rate limiter (per-IP, sliding window)
 RATE_LIMIT = 60  # requests
 RATE_PERIOD = 60  # seconds
@@ -163,4 +159,8 @@ async def run_nmap(payload: dict):
     out = proc.stdout or ""
     err = proc.stderr or ""
     return {"cmd": cmd, "stdout": out, "stderr": err, "returncode": proc.returncode}
+
+# Serve built React frontend (vite build output)
+# Serve static files for GET requests only so API POSTs are routed to FastAPI endpoints.
+app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="static")
 
