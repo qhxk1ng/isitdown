@@ -68,9 +68,10 @@ async def do_http(target: dict):
     if is_private_host(host):
         raise HTTPException(400, "target resolves to a private or local address")
 
+    headers = target.get("headers") or {}
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
         try:
-            resp = await client.request(method, url)
+            resp = await client.request(method, url, headers=headers)
         except httpx.RequestError as e:
             raise HTTPException(502, f"request failed: {e}")
 
