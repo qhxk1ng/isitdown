@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Nav from "./components/Nav";
 
 export default function App() {
-  const [output, setOutput] = useState("Results will appear here...");
+  const [output, setOutput] = useState("Enter a URL or host to check status");
   const [target, setTarget] = useState("");
   const [verbose, setVerbose] = useState(false);
   const [activeTab, setActiveTab] = useState("isitdown");
@@ -15,14 +15,20 @@ export default function App() {
   const [streamPorts, setStreamPorts] = useState([]);
   const [streamBuffer, setStreamBuffer] = useState("");
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState(null); // 'up', 'down', or null
+  const [checkType, setCheckType] = useState(null); // 'website' or 'port'
+  const [responseTime, setResponseTime] = useState(null);
   const esRef = useRef(null);
 
   // Clear output and stop any streaming when changing tabs
   useEffect(() => {
-    setOutput("Results will appear here...");
+    setOutput("Enter a URL or host to check status");
     setStreamPorts([]);
     setStreamBuffer("");
     setLoading(false);
+    setStatus(null);
+    setCheckType(null);
+    setResponseTime(null);
     if (esRef.current) {
       try {
         esRef.current.close();
@@ -34,7 +40,13 @@ export default function App() {
 
   async function postJSON(path, body) {
     setLoading(true);
-    setOutput("Running...");
+    setStatus(null);
+    setCheckType(path === "/api/http" ? "website" : "port");
+    setResponseTime(null);
+    setOutput("Checking...");
+    
+    const startTime = performance.now();
+    
     try {
       const res = await fetch(path, {
         method: "POST",
@@ -42,21 +54,81 @@ export default function App() {
         body: JSON.stringify(body),
       });
       
+      const endTime = performance.now();
+      const elapsed = endTime - startTime;
+      setResponseTime(elapsed.toFixed(0));
+      
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       }
       
       const data = await res.json();
       
-      // If nmap-style output present, parse and show styled port list
-      if (data && typeof data.stdout === "string" && data.stdout.includes("PORT")) {
-        const ports = parseNmap(data.stdout);
-        setOutput({ nmapPorts: ports });
+      // For Quick Check tab, show simple up/down status
+      if (activeTab === "isitdown") {
+        if (path === "/api/http") {
+          if (data.status_code && data.status_code >= 200 && data.status_code < 400) {
+            setStatus('up');
+            setOutput({
+              type: 'website',
+              status: 'up',
+              statusCode: data.status_code,
+              responseTime: elapsed.toFixed(0),
+              details: `Website responded with status ${data.status_code}`
+            });
+          } else {
+            setStatus('down');
+            setOutput({
+              type: 'website',
+              status: 'down',
+              statusCode: data.status_code,
+              responseTime: elapsed.toFixed(0),
+              details: `Website returned status ${data.status_code}`
+            });
+          }
+        } else if (path === "/api/port") {
+          if (data.open) {
+            setStatus('up');
+            setOutput({
+              type: 'port',
+              status: 'up',
+              latency: data.latency_ms,
+              responseTime: elapsed.toFixed(0),
+              details: `Port responded in ${data.latency_ms?.toFixed(2)}ms`
+            });
+          } else {
+            setStatus('down');
+            setOutput({
+              type: 'port',
+              status: 'down',
+              error: data.error,
+              responseTime: elapsed.toFixed(0),
+              details: `Port is closed or unreachable`
+            });
+          }
+        }
       } else {
-        setOutput(JSON.stringify(data, null, 2));
+        // For other tabs, show full output
+        if (data && typeof data.stdout === "string" && data.stdout.includes("PORT")) {
+          const ports = parseNmap(data.stdout);
+          setOutput({ nmapPorts: ports });
+        } else {
+          setOutput(JSON.stringify(data, null, 2));
+        }
       }
     } catch (e) {
-      setOutput(`Error: ${e.message}`);
+      const endTime = performance.now();
+      const elapsed = endTime - startTime;
+      setResponseTime(elapsed.toFixed(0));
+      setStatus('down');
+      setCheckType(path === "/api/http" ? "website" : "port");
+      setOutput({
+        type: path === "/api/http" ? "website" : "port",
+        status: 'down',
+        error: e.message,
+        responseTime: elapsed.toFixed(0),
+        details: `Failed to connect: ${e.message}`
+      });
     } finally {
       setLoading(false);
     }
@@ -180,16 +252,15 @@ export default function App() {
     <div className="app">
       <header className="hero" role="banner">
         <div className="hero-inner">
-          <h1 className="brand">isitdown.space - Free Online Service Checker & Port Scanner</h1>
+          <h1 className="brand">isitdown.space</h1>
           <Nav active={activeTab} onChange={setActiveTab} />
-          <p className="tag">Quick checks for websites, servers and services - No installation required</p>
+          <p className="tag">Quick checks for websites, servers and services</p>
         </div>
       </header>
 
       <main className="container">
         <div>
-          <section className="card" aria-labelledby="main-controls">
-            <h2 id="main-controls" className="visually-hidden">Service Check Controls</h2>
+          <section className="card">
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
               <select
                 className="protocol-select"
@@ -216,16 +287,17 @@ export default function App() {
             </div>
 
             {activeTab === "isitdown" && (
-              <div className="controls" role="group" aria-label="Website checker tools">
+              <div className="controls" role="group" aria-label="Quick check tools">
                 <button 
                   onClick={() => {
                     const url = target.includes("://") ? target : `${protocol}://${target}`;
                     postJSON("/api/http", { url, timeout: 10, verbose });
                   }}
                   disabled={loading || !target.trim()}
-                  aria-label="Check if website is down"
+                  className={loading ? "pulse" : ""}
+                  aria-label="Check if website is up or down"
                 >
-                  {loading ? "Testing..." : "Check Website"}
+                  {loading ? "Checking..." : "Check Website"}
                 </button>
                 <button
                   onClick={() => {
@@ -239,6 +311,7 @@ export default function App() {
                     postJSON("/api/port", { host, port, timeout: 5 });
                   }}
                   disabled={loading || !target.trim()}
+                  className={loading ? "pulse" : ""}
                   aria-label="Check port status"
                 >
                   Check Port
@@ -248,13 +321,14 @@ export default function App() {
                     type="checkbox" 
                     checked={verbose} 
                     onChange={(e) => setVerbose(e.target.checked)} 
-                    aria-label="Enable verbose output"
+                    aria-label="Show detailed output"
                   />
-                  Verbose Output
+                  Details
                 </label>
               </div>
             )}
 
+            {/* Rest of the controls for other tabs remain the same */}
             {activeTab === "scanner" && (
               <div className="controls" role="group" aria-label="Port scanner tools">
                 <label className="chk">
@@ -282,9 +356,8 @@ export default function App() {
                   <button 
                     onClick={() => postJSON("/api/nmap", { host: target, top_ports: topPorts, timeout: 60 })}
                     disabled={loading || !target.trim()}
-                    aria-label="Run online nmap port scan"
                   >
-                    {loading ? "Scanning..." : "Run Nmap Scan"}
+                    {loading ? "Scanning..." : "Service Scan"}
                   </button>
                 )}
                 {liveStream && (
@@ -294,7 +367,7 @@ export default function App() {
                     className={streaming ? "loading" : ""}
                     aria-label="Start live port scanning"
                   >
-                    {streaming ? "Scanning..." : "Live Port Scan"}
+                    {streaming ? "Scanning..." : "Live Scan"}
                   </button>
                 )}
               </div>
@@ -338,7 +411,7 @@ export default function App() {
                   disabled={loading || !target.trim()}
                   aria-label="Send HTTP request like curl or Postman"
                 >
-                  {loading ? "Sending..." : "Send HTTP Request"}
+                  {loading ? "Sending..." : "Send Request"}
                 </button>
               </div>
             )}
@@ -346,28 +419,101 @@ export default function App() {
 
           <section className="card results" style={{ marginTop: 24 }} aria-labelledby="results-heading">
             <h2 id="results-heading" className="visually-hidden">Results</h2>
-            {activeTab === "scanner" && liveStream ? (
+            
+            {/* Aesthetic Status Display for Quick Check */}
+            {activeTab === "isitdown" && (status || loading) ? (
+              <div className="status-container">
+                {loading ? (
+                  <div className="status-loading">
+                    <div className="pulse-ring"></div>
+                    <div className="loading-spinner"></div>
+                    <div className="loading-text">Checking {checkType}...</div>
+                  </div>
+                ) : status === 'up' ? (
+                  <div className="status-up animate-fadeIn">
+                    <div className="status-icon success">
+                      <svg className="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                        <circle className="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+                        <path className="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                      </svg>
+                    </div>
+                    <div className="status-content">
+                      <h3 className="status-title">✓ {output.type === 'website' ? 'Website is UP' : 'Port is OPEN'}</h3>
+                      <div className="status-details">
+                        <div className="status-metric">
+                          <span className="metric-label">Response Time:</span>
+                          <span className="metric-value">{responseTime}ms</span>
+                        </div>
+                        {output.statusCode && (
+                          <div className="status-metric">
+                            <span className="metric-label">Status Code:</span>
+                            <span className="metric-value status-code">{output.statusCode}</span>
+                          </div>
+                        )}
+                        {output.latency && (
+                          <div className="status-metric">
+                            <span className="metric-label">Latency:</span>
+                            <span className="metric-value">{output.latency}ms</span>
+                          </div>
+                        )}
+                        <div className="status-note">{output.details}</div>
+                      </div>
+                    </div>
+                  </div>
+                ) : status === 'down' ? (
+                  <div className="status-down animate-fadeIn">
+                    <div className="status-icon error">
+                      <svg className="xmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                        <circle className="xmark-circle" cx="26" cy="26" r="25" fill="none"/>
+                        <path className="xmark-path" fill="none" d="M16 16l20 20 M36 16l-20 20"/>
+                      </svg>
+                    </div>
+                    <div className="status-content">
+                      <h3 className="status-title">✗ {output.type === 'website' ? 'Website is DOWN' : 'Port is CLOSED'}</h3>
+                      <div className="status-details">
+                        <div className="status-metric">
+                          <span className="metric-label">Response Time:</span>
+                          <span className="metric-value">{responseTime}ms</span>
+                        </div>
+                        {output.statusCode && (
+                          <div className="status-metric">
+                            <span className="metric-label">Status Code:</span>
+                            <span className="metric-value status-code">{output.statusCode}</span>
+                          </div>
+                        )}
+                        <div className="status-note">{output.details}</div>
+                        {output.error && (
+                          <div className="status-error">
+                            <small>Error: {output.error}</small>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : activeTab === "scanner" && liveStream ? (
               <div className="port-list">
                 {streamPorts.length > 0 ? (
                   streamPorts.map((p) => (
-                    <div key={`${p.port}/${p.proto}`} className="port-item" itemScope itemType="https://schema.org/Service">
+                    <div key={`${p.port}/${p.proto}`} className="port-item">
                       <div className="port-badge">
-                        <span className={`dot ${p.state.toLowerCase()}`} aria-label={`Port ${p.state}`} />
-                        <strong itemProp="serviceType">{p.port}</strong>
+                        <span className={`dot ${p.state.toLowerCase()}`} />
+                        <strong>{p.port}</strong>
                         <small>/{p.proto}</small>
                       </div>
                       <div className="port-meta">
                         <div className="service-name">
                           <span className="badge-abbr">{serviceIcon(p.service)}</span>
-                          <span itemProp="name">{p.service}</span>
+                          {p.service}
                         </div>
-                        <div className="service-state" itemProp="serviceStatus">{p.state.toUpperCase()}</div>
+                        <div className="service-state">{p.state.toUpperCase()}</div>
                       </div>
                     </div>
                   ))
                 ) : streaming ? (
                   <div style={{ color: "var(--muted)", textAlign: "center", padding: "40px" }}>
-                    <div style={{ marginBottom: "16px" }}>Scanning ports with online nmap tool...</div>
+                    <div style={{ marginBottom: "16px" }}>Scanning ports...</div>
                     <div className="loading" style={{ 
                       height: "4px", 
                       width: "200px", 
@@ -377,7 +523,7 @@ export default function App() {
                   </div>
                 ) : (
                   <div style={{ color: "var(--muted)", textAlign: "center", padding: "40px" }}>
-                    Click "Live Port Scan" to start scanning with our online nmap tool
+                    Click "Live Scan" to start scanning
                   </div>
                 )}
               </div>
@@ -397,18 +543,18 @@ export default function App() {
               <div className="port-list">
                 {output.nmapPorts.length > 0 ? (
                   output.nmapPorts.map((p) => (
-                    <div key={`${p.port}/${p.proto}`} className="port-item" itemScope itemType="https://schema.org/Service">
+                    <div key={`${p.port}/${p.proto}`} className="port-item">
                       <div className="port-badge">
-                        <span className="dot open" aria-label="Port open" />
-                        <strong itemProp="serviceType">{p.port}</strong>
+                        <span className="dot open" />
+                        <strong>{p.port}</strong>
                         <small>/{p.proto}</small>
                       </div>
                       <div className="port-meta">
                         <div className="service-name">
                           <span className="badge-abbr">{serviceIcon(p.service)}</span>
-                          <span itemProp="name">{p.service}</span>
+                          {p.service}
                         </div>
-                        <div className="service-state" itemProp="serviceStatus">{p.state.toUpperCase()}</div>
+                        <div className="service-state">{p.state.toUpperCase()}</div>
                       </div>
                     </div>
                   ))
@@ -424,117 +570,17 @@ export default function App() {
           </section>
         </div>
 
-        <aside aria-labelledby="seo-content">
+        <aside>
           <section className="card">
-            <h3 id="seo-content" style={{ marginTop: 0 }}>Free Online Tools for Developers & Sysadmins</h3>
-            <div style={{ color: "var(--muted)", marginBottom: 0 }}>
-              <p><strong>isitdown.space</strong> provides free online tools for checking website status, scanning ports, and testing HTTP requests. No installation required.</p>
-              
-              <h4 style={{ marginTop: "16px", marginBottom: "8px" }}>Featured Tools:</h4>
-              <ul style={{ paddingLeft: "20px", marginBottom: "16px" }}>
-                <li><strong>Website Status Checker</strong> - Check if any website is down or online</li>
-                <li><strong>Port Scanner</strong> - Online nmap tool for scanning open ports</li>
-                <li><strong>HTTP Tester</strong> - Curl-like interface for testing APIs and web services</li>
-                <li><strong>Service Scanner</strong> - Detect running services on any server</li>
-                <li><strong>Network Monitor</strong> - Real-time port scanning and service detection</li>
-              </ul>
-              
-              <h4 style={{ marginTop: "16px", marginBottom: "8px" }}>Popular Use Cases:</h4>
-              <ul style={{ paddingLeft: "20px", marginBottom: 0 }}>
-                <li>Check if your website is accessible worldwide</li>
-                <li>Scan servers for open ports like 80, 443, 22, 21</li>
-                <li>Test API endpoints with different HTTP methods</li>
-                <li>Monitor service availability and uptime</li>
-                <li>Debug network connectivity issues</li>
-              </ul>
-            </div>
-          </section>
-          
-          <section className="card" style={{ marginTop: "16px" }}>
-            <h4 style={{ marginTop: 0 }}>Compare With Similar Tools</h4>
-            <p style={{ color: "var(--muted)", marginBottom: "12px", fontSize: "14px" }}>
-              Unlike traditional tools that require installation, <strong>isitdown.space</strong> works directly in your browser:
+            <h3 style={{ marginTop: 0 }}>Quick Tips</h3>
+            <p style={{ color: "var(--muted)", marginBottom: 0 }}>
+              Use full URLs for HTTP (https://). Service scans are TCP connect only.
             </p>
-            <div style={{ fontSize: "13px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                <span>Online Nmap Alternative:</span>
-                <span style={{ color: "#10b981" }}>✓ Available</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                <span>Curl/Postman Online:</span>
-                <span style={{ color: "#10b981" }}>✓ Available</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                <span>Service Checker:</span>
-                <span style={{ color: "#10b981" }}>✓ Available</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                <span>Port Scanner:</span>
-                <span style={{ color: "#10b981" }}>✓ Available</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>Real-time Monitoring:</span>
-                <span style={{ color: "#10b981" }}>✓ Available</span>
-              </div>
-            </div>
-          </section>
-          
-          <section className="card" style={{ marginTop: "16px" }}>
-            <h4 style={{ marginTop: 0 }}>SEO Keywords</h4>
-            <div style={{ 
-              display: "flex", 
-              flexWrap: "wrap", 
-              gap: "8px", 
-              marginTop: "12px" 
-            }}>
-              {[
-                "isitdown",
-                "service checker",
-                "port scanner",
-                "online nmap",
-                "online curl",
-                "HTTP tester",
-                "API tester",
-                "website status",
-                "server monitor",
-                "network scanner",
-                "port check",
-                "online postman",
-                "web service tester",
-                "uptime checker",
-                "service monitor"
-              ].map((keyword, index) => (
-                <span 
-                  key={index}
-                  style={{
-                    padding: "6px 12px",
-                    background: "rgba(59, 130, 246, 0.1)",
-                    borderRadius: "20px",
-                    fontSize: "12px",
-                    color: "var(--accent-light)",
-                    border: "1px solid rgba(59, 130, 246, 0.2)"
-                  }}
-                >
-                  {keyword}
-                </span>
-              ))}
-            </div>
           </section>
         </aside>
       </main>
 
-      <footer className="footer" role="contentinfo">
-        <div style={{ maxWidth: "800px", margin: "0 auto", lineHeight: "1.6" }}>
-          <p style={{ marginBottom: "8px" }}>
-            <strong>isitdown.space</strong> - Free Online Service Checker, Port Scanner & HTTP Tester Tool
-          </p>
-          <p style={{ fontSize: "12px", color: "var(--muted-dark)", margin: 0 }}>
-            This free online tool combines features of nmap, curl, and service monitoring in one web application. 
-            Check website status, scan ports with our online nmap alternative, test APIs with curl-like interface. 
-            Perfect for developers, sysadmins, and IT professionals. No registration required.
-          </p>
-        </div>
-      </footer>
+      <footer className="footer">Built with FastAPI · No auth · Limited scans</footer>
     </div>
   );
 }
