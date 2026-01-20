@@ -5,8 +5,10 @@ FROM node:18-alpine AS frontend-builder
 WORKDIR /src
 COPY frontend/package.json frontend/package-lock.json* ./ 
 COPY frontend/ ./
-RUN npm ci
+# Use npm install (package-lock.json may be missing). For reproducible builds prefer adding package-lock.json and using `npm ci`.
+RUN npm install
 RUN npm run build
+ 
 
 # --- final stage: python app ---
 FROM python:3.11-slim
