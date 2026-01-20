@@ -78,17 +78,21 @@ export default function App() {
   }
 
   function serviceIcon(name) {
+    // return an uppercase short label (no emojis) for consistency and clean UI
+    if (!name) return "UNK";
+    const n = String(name).toUpperCase();
+    // common abbreviations
     const map = {
-      ftp: "📁",
-      ssh: "🔒",
-      http: "🌐",
-      https: "🔒",
-      smtp: "✉️",
-      domain: "🛰️",
-      imap: "📬",
-      pop3: "📮",
+      FTP: "FTP",
+      SSH: "SSH",
+      HTTP: "HTTP",
+      HTTPS: "HTTPS",
+      SMTP: "SMTP",
+      DOMAIN: "DNS",
+      IMAP: "IMAP",
+      POP3: "POP3",
     };
-    return map[name] || "⚙️";
+    return map[n] || n.slice(0, 4);
   }
 
   function startStream(host, ports) {
@@ -283,7 +287,8 @@ export default function App() {
                     </div>
                     <div className="port-meta">
                       <div className="service-name">
-                        {serviceIcon(p.service)} {p.service}
+                        <span className="badge-abbr">{serviceIcon(p.service)}</span>
+                        {p.service}
                       </div>
                       <div className="service-state">{p.state}</div>
                     </div>
@@ -303,7 +308,7 @@ export default function App() {
                       <small>/{p.proto}</small>
                     </div>
                     <div className="port-meta">
-                      <div className="service-name">{serviceIcon(p.service)} {p.service}</div>
+                      <div className="service-name"><span className="badge-abbr">{serviceIcon(p.service)}</span>{p.service}</div>
                       <div className="service-state">{p.state}</div>
                     </div>
                   </div>

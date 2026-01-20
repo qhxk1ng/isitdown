@@ -6,7 +6,7 @@
   --glass: rgba(255,255,255,0.03);
   --glass-2: rgba(255,255,255,0.02);
   --radius:14px;
-  --mono: Inter, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  --mono: "Poppins", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial;
 }
 *{box-sizing:border-box;font-family:var(--mono);color:#eaf3ff}
 body{margin:0;min-height:100vh;background:
@@ -17,14 +17,16 @@ body{margin:0;min-height:100vh;background:
 .brand{margin:0;font-size:22px;font-weight:800;letter-spacing:0.4px}
 .tag{margin:0;color:var(--muted);font-size:14px}
 .nav ul{display:flex;gap:12px;list-style:none;padding:0;margin:0;align-items:center}
-.nav-item{padding:8px 12px;border-radius:10px;color:var(--muted);cursor:pointer;transition:background .15s, transform .12s}
+.nav-item{padding:8px 12px;border-radius:10px;color:var(--muted);cursor:pointer;transition:background .25s, transform .18s, color .18s}
 .nav-item:hover{background:var(--glass);transform:translateY(-2px);color:#fff}
 .nav-item.active{background:linear-gradient(90deg,var(--accent),#60a5fa);color:#012}
 .container{max-width:1100px;margin:26px auto;padding:0 18px;flex:1;display:grid;grid-template-columns:1fr 420px;gap:18px}
-.card{background:linear-gradient(180deg,var(--glass),transparent);padding:18px;border-radius:var(--radius);box-shadow:0 8px 30px rgba(2,6,23,0.6)}
-.target{width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:inherit;outline:none;font-size:15px}
+.card{background:linear-gradient(180deg,var(--glass),transparent);padding:18px;border-radius:var(--radius);box-shadow:0 8px 30px rgba(2,6,23,0.6);transition:transform .18s ease,box-shadow .18s ease}
+.card:hover{transform:translateY(-6px);box-shadow:0 20px 50px rgba(2,6,23,0.75)}
+.target{width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);color:inherit;outline:none;font-size:15px;transition:box-shadow .18s, border-color .18s}
+.target:focus{box-shadow:0 8px 30px rgba(59,130,246,0.08);border-color:rgba(59,130,246,0.28)}
 .controls{display:flex;gap:10px;margin-top:12px;align-items:center;flex-wrap:wrap}
-button{background:linear-gradient(90deg,var(--accent),#60a5fa);border:none;color:#012;padding:9px 12px;border-radius:10px;font-weight:700;cursor:pointer;transition:transform .12s,opacity .12s}
+button{background:linear-gradient(90deg,var(--accent),#60a5fa);border:none;color:#012;padding:9px 12px;border-radius:10px;font-weight:700;cursor:pointer;transition:transform .18s,opacity .18s,box-shadow .18s}
 /* protocol / method selects styled to match buttons */
 .protocol-select, .method-select, .controls select {
   background: linear-gradient(90deg,var(--accent),#60a5fa);
@@ -36,9 +38,23 @@ button{background:linear-gradient(90deg,var(--accent),#60a5fa);border:none;color
   cursor: pointer;
   -webkit-appearance: none;
   appearance: none;
+  transition: transform .18s, box-shadow .18s;
+  box-shadow: 0 6px 18px rgba(59,130,246,0.12);
 }
+.protocol-select:hover, .controls select:hover{ transform: translateY(-2px) }
 .protocol-select { min-width: 86px; text-transform: lowercase; }
 .controls select { min-width: 88px; }
+.protocol-select option, .controls select option { color: #012; background: #eaf3ff; }
+/* custom caret */
+.protocol-select {
+  background-image: linear-gradient(45deg, transparent 50%, rgba(1,6,16,0.08) 50%), linear-gradient(135deg, rgba(1,6,16,0.08) 50%, transparent 50%), linear-gradient(to right, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  background-position: calc(100% - 18px) calc(1em + 2px), calc(100% - 13px) calc(1em + 2px), 0 0;
+  background-size: 6px 6px, 6px 6px, 100% 100%;
+  background-repeat: no-repeat;
+  padding-right: 34px;
+}
+/* remove native ugly outline on focus */
+.protocol-select:focus, .controls select:focus { outline: none; box-shadow: 0 10px 30px rgba(59,130,246,0.18); }
 button:hover{transform:translateY(-3px)}
 .chk{color:var(--muted);display:inline-flex;align-items:center;gap:8px}
 .results pre{white-space:pre-wrap;word-break:break-word;margin:0;background:transparent;border:none;color:#eaf3ff;font-size:13px}
@@ -51,16 +67,16 @@ button:hover{transform:translateY(-3px)}
 
 /* nmap port list */
 .port-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
-.port-item{display:flex;align-items:center;gap:12px;padding:10px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);box-shadow:0 6px 18px rgba(2,6,23,0.45)}
-.port-badge{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:linear-gradient(90deg,#3b82f6, #60a5fa);color:#012;font-weight:800;box-shadow:0 6px 18px rgba(59,130,246,0.18)}
+.port-item{display:flex;align-items:center;gap:12px;padding:10px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);box-shadow:0 6px 18px rgba(2,6,23,0.45);transition:transform .18s, box-shadow .18s}
+.port-item:hover{transform:translateY(-4px);box-shadow:0 14px 36px rgba(2,6,23,0.65)}
+.port-badge{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:linear-gradient(90deg,#3b82f6, #60a5fa);color:#012;font-weight:800;box-shadow:0 6px 18px rgba(59,130,246,0.18);transition:transform .18s, box-shadow .18s}
 .port-badge .dot{width:10px;height:10px;border-radius:50%;box-shadow:0 0 12px rgba(0,255,100,0.9),0 0 28px rgba(59,130,246,0.08)}
 .port-badge .dot.open{background:limegreen; animation: pulse 2s infinite;}
 .port-badge .dot.filtered{background:orange; animation: pulse 2s infinite;}
 .port-badge .dot.closed{background:#777; box-shadow:none;}
 
 .service-name{font-weight:700;display:flex;gap:8px;align-items:center}
-.service-name svg, .service-name img{width:18px;height:18px}
-.service-name .icon-emoji{margin-right:6px}
+.service-name .badge-abbr{display:inline-flex;align-items:center;justify-content:center;width:28px;height:20px;border-radius:6px;background:rgba(255,255,255,0.06);color:#eaf3ff;font-weight:700;font-size:12px;margin-right:8px}
 .service-state{font-size:12px;color:var(--muted)}
 
 @keyframes pulse {
