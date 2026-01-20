@@ -2,10 +2,9 @@ import React from "react";
 
 export default function Nav({ active = "isitdown", onChange }) {
   const items = [
-    { id: "home", label: "Home" },
-    { id: "isitdown", label: "Isitdown" },
-    { id: "scanner", label: "Service scanner" },
-    { id: "curl", label: "curl" },
+    { id: "isitdown", label: "Quick Check" },
+    { id: "scanner", label: "Service Scanner" },
+    { id: "curl", label: "Advanced HTTP" },
   ];
 
   return (
@@ -17,6 +16,7 @@ export default function Nav({ active = "isitdown", onChange }) {
               type="button"
               className={`nav-item ${active === it.id ? "active" : ""}`}
               onClick={() => onChange && onChange(it.id)}
+              aria-current={active === it.id ? "page" : undefined}
             >
               {it.label}
             </button>
