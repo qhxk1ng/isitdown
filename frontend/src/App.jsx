@@ -580,7 +580,7 @@ export default function App() {
         </aside>
       </main>
 
-      <footer className="footer">Built with FastAPI · No auth · Limited scans</footer>
+      <footer className="footer">Built by Abraham.API · No auth · Limited scans</footer>
     </div>
   );
 }
