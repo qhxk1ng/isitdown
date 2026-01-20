@@ -10,7 +10,7 @@ import subprocess
 import time
 from typing import Optional
 
-app = FastAPI(title="isitdown.space API")
+app = FastAPI(title="Isitdown? API")  # Changed from "isitdown.space API"
 
 # Simple in-memory rate limiter (per-IP, sliding window)
 RATE_LIMIT = 60  # requests
