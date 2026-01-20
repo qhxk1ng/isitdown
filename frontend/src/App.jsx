@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Nav from "./components/Nav";
 
 export default function App() {
@@ -9,10 +9,26 @@ export default function App() {
   const [curlMethod, setCurlMethod] = useState("GET");
   const [curlHeaders, setCurlHeaders] = useState("");
   const [topPorts, setTopPorts] = useState(100);
+  const [protocol, setProtocol] = useState("https");
   const [liveStream, setLiveStream] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [streamPorts, setStreamPorts] = useState([]);
   const [streamBuffer, setStreamBuffer] = useState("");
+  const esRef = useRef(null);
+
+  // clear output and stop any streaming when changing tabs
+  useEffect(() => {
+    setOutput("Results will appear here...");
+    setStreamPorts([]);
+    setStreamBuffer("");
+    if (esRef.current) {
+      try {
+        esRef.current.close();
+      } catch (e) {}
+      esRef.current = null;
+    }
+    setStreaming(false);
+  }, [activeTab]);
 
 
   async function postJSON(path, body) {
@@ -85,18 +101,25 @@ export default function App() {
     setStreamBuffer("");
     const url = `/api/nmap/stream?host=${encodeURIComponent(host)}&top_ports=${ports}`;
     const es = new EventSource(url);
+    esRef.current = es;
     es.onmessage = (e) => {
       const d = e.data;
       if (!d) return;
       if (d.startsWith("__DONE__")) {
         setStreaming(false);
-        es.close();
+        if (esRef.current) {
+          esRef.current.close();
+          esRef.current = null;
+        }
         return;
       }
       if (d.startsWith("__ERROR__")) {
         setOutput(d);
         setStreaming(false);
-        es.close();
+        if (esRef.current) {
+          esRef.current.close();
+          esRef.current = null;
+        }
         return;
       }
       // append to buffer and parse
@@ -110,7 +133,10 @@ export default function App() {
     es.onerror = (err) => {
       setOutput("stream error");
       setStreaming(false);
-      es.close();
+      if (esRef.current) {
+        esRef.current.close();
+        esRef.current = null;
+      }
     };
   }
 
@@ -127,16 +153,30 @@ export default function App() {
       <main className="container">
         <div>
           <section className="card">
-            <input
-              className="target"
-              placeholder="https://example.com or example.com:80"
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-            />
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <select
+                className="protocol-select"
+                value={protocol}
+                onChange={(e) => setProtocol(e.target.value)}
+                aria-label="Protocol"
+              >
+                <option value="http">http</option>
+                <option value="https">https</option>
+              </select>
+              <input
+                className="target"
+                placeholder="example.com or example.com:80"
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+              />
+            </div>
 
             {activeTab === "isitdown" && (
               <div className="controls">
-                <button onClick={() => postJSON("/api/http", { url: target, timeout: 10, verbose })}>
+                <button onClick={() => {
+                  const url = target.includes("://") ? target : `${protocol}://${target}`;
+                  postJSON("/api/http", { url, timeout: 10, verbose });
+                }}>
                   HTTP
                 </button>
                 <button
@@ -221,7 +261,8 @@ export default function App() {
                       setOutput("Invalid headers JSON");
                       return;
                     }
-                    postJSON("/api/http", { url: target, method: curlMethod, timeout: 15, verbose: true, headers });
+                    const url = target.includes("://") ? target : `${protocol}://${target}`;
+                    postJSON("/api/http", { url, method: curlMethod, timeout: 15, verbose: true, headers });
                   }}
                 >
                   Send
