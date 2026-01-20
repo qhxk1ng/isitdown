@@ -38,6 +38,13 @@ export default function App() {
     setStreaming(false);
   }, [activeTab]);
 
+  // Hide headers placeholder when GET is selected
+  useEffect(() => {
+    if (activeTab === "curl" && curlMethod === "GET") {
+      setCurlHeaders("");
+    }
+  }, [curlMethod, activeTab]);
+
   async function postJSON(path, body) {
     setLoading(true);
     setStatus(null);
@@ -294,10 +301,10 @@ export default function App() {
                     postJSON("/api/http", { url, timeout: 10, verbose });
                   }}
                   disabled={loading || !target.trim()}
-                  className={loading ? "pulse" : ""}
+                  className={loading && checkType === 'website' ? "pulse" : ""}
                   aria-label="Check if website is up or down"
                 >
-                  {loading ? "Checking..." : "Check Website"}
+                  {loading && checkType === 'website' ? "Checking..." : "Check Website"}
                 </button>
                 <button
                   onClick={() => {
@@ -311,10 +318,10 @@ export default function App() {
                     postJSON("/api/port", { host, port, timeout: 5 });
                   }}
                   disabled={loading || !target.trim()}
-                  className={loading ? "pulse" : ""}
+                  className={loading && checkType === 'port' ? "pulse" : ""}
                   aria-label="Check port status"
                 >
-                  Check Port
+                  {loading && checkType === 'port' ? "Checking..." : "Check Port"}
                 </button>
                 <label className="chk">
                   <input 
@@ -328,7 +335,6 @@ export default function App() {
               </div>
             )}
 
-            {/* Rest of the controls for other tabs remain the same */}
             {activeTab === "scanner" && (
               <div className="controls" role="group" aria-label="Port scanner tools">
                 <label className="chk">
@@ -389,12 +395,13 @@ export default function App() {
                   <option>PATCH</option>
                 </select>
                 <input
-                  placeholder='{"Authorization": "Bearer token", "Content-Type": "application/json"}'
+                  placeholder={curlMethod === "GET" ? "Headers disabled for GET requests" : '{"Authorization": "Bearer token", "Content-Type": "application/json"}'}
                   value={curlHeaders}
                   onChange={(e) => setCurlHeaders(e.target.value)}
                   className="target"
                   style={{ flex: 1 }}
                   aria-label="HTTP headers in JSON format"
+                  disabled={curlMethod === "GET"}
                 />
                 <button
                   onClick={() => {
@@ -438,22 +445,24 @@ export default function App() {
                       </svg>
                     </div>
                     <div className="status-content">
-                      <h3 className="status-title">✓ {output.type === 'website' ? 'Website is UP' : 'Port is OPEN'}</h3>
+                      <h3 className="status-title">
+                        {output.type === 'website' ? '✓ Website is UP' : '✓ Service is UP'}
+                      </h3>
                       <div className="status-details">
                         <div className="status-metric">
                           <span className="metric-label">Response Time:</span>
                           <span className="metric-value">{responseTime}ms</span>
                         </div>
-                        {output.statusCode && (
+                        {output.type === 'website' && output.statusCode && (
                           <div className="status-metric">
                             <span className="metric-label">Status Code:</span>
                             <span className="metric-value status-code">{output.statusCode}</span>
                           </div>
                         )}
-                        {output.latency && (
+                        {output.type === 'port' && output.latency && (
                           <div className="status-metric">
                             <span className="metric-label">Latency:</span>
-                            <span className="metric-value">{output.latency}ms</span>
+                            <span className="metric-value">{parseFloat(output.latency).toFixed(2)}ms</span>
                           </div>
                         )}
                         <div className="status-note">{output.details}</div>
@@ -469,13 +478,15 @@ export default function App() {
                       </svg>
                     </div>
                     <div className="status-content">
-                      <h3 className="status-title">✗ {output.type === 'website' ? 'Website is DOWN' : 'Port is CLOSED'}</h3>
+                      <h3 className="status-title">
+                        {output.type === 'website' ? '✗ Website is DOWN' : '✗ Service is DOWN'}
+                      </h3>
                       <div className="status-details">
                         <div className="status-metric">
                           <span className="metric-label">Response Time:</span>
                           <span className="metric-value">{responseTime}ms</span>
                         </div>
-                        {output.statusCode && (
+                        {output.type === 'website' && output.statusCode && (
                           <div className="status-metric">
                             <span className="metric-label">Status Code:</span>
                             <span className="metric-value status-code">{output.statusCode}</span>
