@@ -34,3 +34,26 @@ button:hover{transform:translateY(-3px)}
 @media (max-width:900px){
   .container{grid-template-columns:1fr; padding:16px}
 }
+
+/* nmap port list */
+.port-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.port-item{display:flex;align-items:center;gap:12px;padding:10px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);box-shadow:0 6px 18px rgba(2,6,23,0.45)}
+.port-badge{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:linear-gradient(90deg,#3b82f6, #60a5fa);color:#012;font-weight:800;box-shadow:0 6px 18px rgba(59,130,246,0.18)}
+.port-badge .dot{width:10px;height:10px;border-radius:50%;box-shadow:0 0 12px rgba(0,255,100,0.9),0 0 28px rgba(59,130,246,0.08)}
+.port-badge .dot.open{background:limegreen; animation: pulse 2s infinite;}
+.port-badge .dot.filtered{background:orange; animation: pulse 2s infinite;}
+.port-badge .dot.closed{background:#777; box-shadow:none;}
+
+.service-name{font-weight:700;display:flex;gap:8px;align-items:center}
+.service-name svg, .service-name img{width:18px;height:18px}
+.service-name .icon-emoji{margin-right:6px}
+.service-state{font-size:12px;color:var(--muted)}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 6px rgba(0,255,120,0.6), 0 0 18px rgba(59,130,246,0.05); transform: scale(1); }
+  50% { box-shadow: 0 0 18px rgba(0,255,120,0.95), 0 0 32px rgba(59,130,246,0.08); transform: scale(1.06); }
+  100% { box-shadow: 0 0 6px rgba(0,255,120,0.6), 0 0 18px rgba(59,130,246,0.05); transform: scale(1); }
+}
+.port-meta{display:flex;flex-direction:column}
+.service-name{font-weight:700}
+.service-state{font-size:12px;color:var(--muted)}

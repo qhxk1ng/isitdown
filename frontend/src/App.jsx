@@ -9,6 +9,10 @@ export default function App() {
   const [curlMethod, setCurlMethod] = useState("GET");
   const [curlHeaders, setCurlHeaders] = useState("");
   const [topPorts, setTopPorts] = useState(100);
+  const [liveStream, setLiveStream] = useState(false);
+  const [streaming, setStreaming] = useState(false);
+  const [streamPorts, setStreamPorts] = useState([]);
+  const [streamBuffer, setStreamBuffer] = useState("");
 
 
   async function postJSON(path, body) {
@@ -20,10 +24,94 @@ export default function App() {
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      setOutput(JSON.stringify(data, null, 2));
+      // If nmap-style output present, parse and show styled port list
+      if (data && typeof data.stdout === "string" && data.stdout.includes("PORT")) {
+        const ports = parseNmap(data.stdout);
+        setOutput({ nmapPorts: ports });
+      } else {
+        setOutput(JSON.stringify(data, null, 2));
+      }
     } catch (e) {
       setOutput("Request failed: " + e);
     }
+  }
+
+  function parseNmap(raw) {
+    const lines = raw.split("\n");
+    const ports = [];
+    let inTable = false;
+    for (const line of lines) {
+      if (!inTable) {
+        if (line.trim().startsWith("PORT")) {
+          inTable = true;
+        }
+        continue;
+      }
+      const l = line.trim();
+      if (!l) continue;
+      // expected format: "21/tcp   open  ftp"
+      const parts = l.split(/\s+/);
+      if (parts.length >= 3) {
+        const [portProto, state, service] = parts;
+        const [portStr, proto] = portProto.split("/");
+        const port = Number(portStr);
+        ports.push({ port, proto, state, service });
+      }
+    }
+    return ports;
+  }
+
+  function serviceIcon(name) {
+    const map = {
+      ftp: "📁",
+      ssh: "🔒",
+      http: "🌐",
+      https: "🔒",
+      smtp: "✉️",
+      domain: "🛰️",
+      imap: "📬",
+      pop3: "📮",
+    };
+    return map[name] || "⚙️";
+  }
+
+  function startStream(host, ports) {
+    if (!host) {
+      setOutput("enter host");
+      return;
+    }
+    setStreaming(true);
+    setStreamPorts([]);
+    setStreamBuffer("");
+    const url = `/api/nmap/stream?host=${encodeURIComponent(host)}&top_ports=${ports}`;
+    const es = new EventSource(url);
+    es.onmessage = (e) => {
+      const d = e.data;
+      if (!d) return;
+      if (d.startsWith("__DONE__")) {
+        setStreaming(false);
+        es.close();
+        return;
+      }
+      if (d.startsWith("__ERROR__")) {
+        setOutput(d);
+        setStreaming(false);
+        es.close();
+        return;
+      }
+      // append to buffer and parse
+      setStreamBuffer((prev) => {
+        const next = prev + "\n" + d;
+        const portsParsed = parseNmap(next);
+        setStreamPorts(portsParsed);
+        return next;
+      });
+    };
+    es.onerror = (err) => {
+      setOutput("stream error");
+      setStreaming(false);
+      es.close();
+    };
   }
 
   return (
@@ -83,9 +171,30 @@ export default function App() {
                     style={{ width: 96, marginLeft: 8, padding: 6, borderRadius: 8 }}
                   />
                 </label>
-                <button onClick={() => postJSON("/api/nmap", { host: target, top_ports: topPorts, timeout: 60 })}>
-                  Service scan
-                </button>
+                <label className="chk">
+                  Live:
+                  <input
+                    type="checkbox"
+                    checked={liveStream}
+                    onChange={(e) => setLiveStream(e.target.checked)}
+                    style={{ marginLeft: 8 }}
+                  />
+                </label>
+                {!liveStream && (
+                  <button onClick={() => postJSON("/api/nmap", { host: target, top_ports: topPorts, timeout: 60 })}>
+                    Service scan
+                  </button>
+                )}
+                {liveStream && (
+                  <button
+                    onClick={() => {
+                      startStream(target, topPorts);
+                    }}
+                    disabled={streaming}
+                  >
+                    {streaming ? "Scanning…" : "Live Scan"}
+                  </button>
+                )}
               </div>
             )}
 
@@ -121,8 +230,47 @@ export default function App() {
             )}
           </section>
 
-          <section className="card results" style={{ marginTop: 18 }}>
-            <pre>{output}</pre>
+        <section className="card results" style={{ marginTop: 18 }}>
+            {activeTab === "scanner" && liveStream ? (
+              <div className="port-list">
+                {streamPorts.map((p) => (
+                  <div key={`${p.port}/${p.proto}`} className="port-item">
+                    <div className="port-badge">
+                      <span className={`dot ${p.state}`} />
+                      <strong>{p.port}</strong>
+                      <small>/{p.proto}</small>
+                    </div>
+                    <div className="port-meta">
+                      <div className="service-name">
+                        {serviceIcon(p.service)} {p.service}
+                      </div>
+                      <div className="service-state">{p.state}</div>
+                    </div>
+                  </div>
+                ))}
+                {streaming && streamPorts.length === 0 && <div style={{ color: "var(--muted)" }}>Waiting for results…</div>}
+              </div>
+            ) : typeof output === "string" ? (
+              <pre>{output}</pre>
+            ) : output && output.nmapPorts ? (
+              <div className="port-list">
+                {output.nmapPorts.map((p) => (
+                  <div key={`${p.port}/${p.proto}`} className="port-item">
+                    <div className="port-badge">
+                      <span className="dot open" />
+                      <strong>{p.port}</strong>
+                      <small>/{p.proto}</small>
+                    </div>
+                    <div className="port-meta">
+                      <div className="service-name">{serviceIcon(p.service)} {p.service}</div>
+                      <div className="service-state">{p.state}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <pre>{JSON.stringify(output, null, 2)}</pre>
+            )}
           </section>
         </div>
 

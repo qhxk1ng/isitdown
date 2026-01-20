@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import asyncio
 import httpx
@@ -163,4 +163,58 @@ async def run_nmap(payload: dict):
 # Serve built React frontend (vite build output)
 # Serve static files for GET requests only so API POSTs are routed to FastAPI endpoints.
 app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="static")
+
+
+@app.get("/api/nmap/stream")
+async def stream_nmap(host: str, top_ports: int = 100):
+    """
+    Stream nmap stdout as Server-Sent Events.
+    GET params: host, top_ports
+    """
+    if not host:
+        raise HTTPException(400, "host is required")
+    if top_ports <= 0 or top_ports > 1000:
+        raise HTTPException(400, "top_ports must be between 1 and 1000")
+    if is_private_host(host):
+        raise HTTPException(400, "target resolves to a private or local address")
+
+    nmap_path = shutil.which("nmap")
+    if not nmap_path:
+        raise HTTPException(400, "nmap binary not found on server")
+
+    cmd = [
+        nmap_path,
+        "-sT",
+        "--top-ports",
+        str(top_ports),
+        "--open",
+        host,
+    ]
+
+    async def event_stream():
+        # spawn subprocess and stream stdout lines as SSE data events
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        try:
+            # send a start event
+            yield f"data: __START__\n\n"
+            buf = b""
+            while True:
+                line = await proc.stdout.readline()
+                if not line:
+                    break
+                # forward line
+                text = line.decode(errors="replace").rstrip("\n")
+                yield f"data: {text}\n\n"
+                buf += line
+            await proc.wait()
+            # send done with returncode and any stderr
+            stderr = (await proc.stderr.read()).decode(errors="replace")
+            done_payload = {"returncode": proc.returncode, "stderr": stderr}
+            yield f"data: __DONE__ {done_payload}\n\n"
+        except Exception as e:
+            yield f"data: __ERROR__ {str(e)}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
