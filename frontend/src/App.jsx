@@ -1,602 +1,1319 @@
-import React, { useState, useEffect, useRef } from "react";
-import Nav from "./components/Nav";
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Container,
+  Box,
+  Button,
+  IconButton,
+  Drawer,
+  List,
+  ListItem,
+  ListItemText,
+  useTheme,
+  useMediaQuery,
+  Card,
+  CardContent,
+  Grid,
+  TextField,
+  Alert,
+  CircularProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip,
+  Paper,
+  Divider,
+  Tabs,
+  Tab,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Switch,
+  FormControlLabel,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Slider,
+} from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
+import HomeIcon from '@mui/icons-material/Home';
+import TerminalIcon from '@mui/icons-material/Terminal';
+import NetworkCheckIcon from '@mui/icons-material/NetworkCheck';
+import SearchIcon from '@mui/icons-material/Search';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
+import PublicIcon from '@mui/icons-material/Public';
+import SpeedIcon from '@mui/icons-material/Speed';
+import LanguageIcon from '@mui/icons-material/Language';
 
-export default function App() {
-  const [output, setOutput] = useState("Enter a URL or host to check status");
-  const [target, setTarget] = useState("");
-  const [verbose, setVerbose] = useState(false);
-  function mapPathToTab(path) {
-    if (!path) return "isitdown";
-    if (path.startsWith("/port-scan")) return "scanner";
-    if (path.startsWith("/curl")) return "curl";
-    if (path.startsWith("/status")) return "isitdown";
-    return "home";
-  }
-  const [activeTab, setActiveTab] = useState(mapPathToTab(window.location.pathname));
-  const [curlMethod, setCurlMethod] = useState("GET");
-  const [curlHeaders, setCurlHeaders] = useState("");
-  const [topPorts, setTopPorts] = useState(100);
-  const [protocol, setProtocol] = useState("https");
-  const [liveStream, setLiveStream] = useState(false);
-  const [streaming, setStreaming] = useState(false);
-  const [streamPorts, setStreamPorts] = useState([]);
-  const [streamBuffer, setStreamBuffer] = useState("");
+// Home Component
+const Home = () => {
+  return (
+    <Box sx={{ maxWidth: 1200, margin: '0 auto', textAlign: 'center' }}>
+      <Typography variant="h2" component="h1" gutterBottom sx={{ 
+        fontWeight: 800, 
+        color: '#071129',
+        mb: 4,
+        background: 'linear-gradient(45deg, #1976d2 30%, #21CBF3 90%)',
+        backgroundClip: 'text',
+        textFillColor: 'transparent',
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+      }}>
+        Isitdown?
+      </Typography>
+      
+      <Typography variant="h5" color="text.secondary" paragraph sx={{ mb: 6 }}>
+        Free Online Service Checker, Port Scanner & HTTP Tester
+      </Typography>
+
+      <Grid container spacing={4} sx={{ mb: 8 }}>
+        <Grid item xs={12} md={4}>
+          <Card sx={{ height: '100%', boxShadow: 3, transition: 'transform 0.3s', '&:hover': { transform: 'translateY(-8px)' } }}>
+            <CardContent sx={{ p: 4 }}>
+              <TerminalIcon sx={{ fontSize: 60, color: '#1976d2', mb: 2 }} />
+              <Typography variant="h5" gutterBottom>
+                Curl Tool
+              </Typography>
+              <Typography variant="body2" color="text.secondary" paragraph>
+                Send HTTP requests, set custom headers, and inspect responses with our curl-like interface.
+              </Typography>
+              <Button
+                variant="contained"
+                component={Link}
+                to="/curl"
+                sx={{ mt: 2 }}
+              >
+                Try Curl Tool
+              </Button>
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        <Grid item xs={12} md={4}>
+          <Card sx={{ height: '100%', boxShadow: 3, transition: 'transform 0.3s', '&:hover': { transform: 'translateY(-8px)' } }}>
+            <CardContent sx={{ p: 4 }}>
+              <NetworkCheckIcon sx={{ fontSize: 60, color: '#1976d2', mb: 2 }} />
+              <Typography variant="h5" gutterBottom>
+                Port Scanner
+              </Typography>
+              <Typography variant="body2" color="text.secondary" paragraph>
+                Check if ports are open or closed on any host. Perfect for testing firewall rules and port forwarding.
+              </Typography>
+              <Button
+                variant="contained"
+                component={Link}
+                to="/port-scan"
+                sx={{ mt: 2 }}
+              >
+                Scan Ports
+              </Button>
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        <Grid item xs={12} md={4}>
+          <Card sx={{ height: '100%', boxShadow: 3, transition: 'transform 0.3s', '&:hover': { transform: 'translateY(-8px)' } }}>
+            <CardContent sx={{ p: 4 }}>
+              <SearchIcon sx={{ fontSize: 60, color: '#1976d2', mb: 2 }} />
+              <Typography variant="h5" gutterBottom>
+                Status Checker
+              </Typography>
+              <Typography variant="body2" color="text.secondary" paragraph>
+                Quickly check if a website or server is up. Test HTTP endpoints and monitor service availability.
+              </Typography>
+              <Button
+                variant="contained"
+                component={Link}
+                to="/status"
+                sx={{ mt: 2 }}
+              >
+                Check Status
+              </Button>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      <Card sx={{ bgcolor: '#f8f9fa', p: 4, borderRadius: 2 }}>
+        <Typography variant="h4" gutterBottom sx={{ color: '#071129' }}>
+          Why Choose Isitdown?
+        </Typography>
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={4}>
+            <Box sx={{ textAlign: 'center', p: 2 }}>
+              <SpeedIcon sx={{ fontSize: 40, color: '#1976d2', mb: 2 }} />
+              <Typography variant="h6" gutterBottom>Fast & Reliable</Typography>
+              <Typography variant="body2">Quick checks with real-time results. No waiting, no delays.</Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Box sx={{ textAlign: 'center', p: 2 }}>
+              <LanguageIcon sx={{ fontSize: 40, color: '#1976d2', mb: 2 }} />
+              <Typography variant="h6" gutterBottom>No Installation</Typography>
+              <Typography variant="body2">Everything runs in your browser. No downloads or setup required.</Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Box sx={{ textAlign: 'center', p: 2 }}>
+              <PublicIcon sx={{ fontSize: 40, color: '#1976d2', mb: 2 }} />
+              <Typography variant="h6" gutterBottom>Free Forever</Typography>
+              <Typography variant="body2">Completely free to use. No hidden fees or premium plans.</Typography>
+            </Box>
+          </Grid>
+        </Grid>
+      </Card>
+    </Box>
+  );
+};
+
+// Curl Tool Component
+const CurlTool = () => {
+  const [url, setUrl] = useState('https://api.github.com');
+  const [method, setMethod] = useState('GET');
+  const [headers, setHeaders] = useState([{ key: 'User-Agent', value: 'Isitdown-Curl-Tool/1.0' }]);
+  const [body, setBody] = useState('');
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState(null); // 'up', 'down', or null
-  const [checkType, setCheckType] = useState(null); // 'website' or 'port'
-  const [responseTime, setResponseTime] = useState(null);
-  const esRef = useRef(null);
+  const [response, setResponse] = useState(null);
+  const [error, setError] = useState('');
+  const [verbose, setVerbose] = useState(false);
+  const [timeout, setTimeout] = useState(10);
 
-  // Clear output and stop any streaming when changing tabs
-  useEffect(() => {
-    setOutput("Enter a URL or host to check status");
-    setStreamPorts([]);
-    setStreamBuffer("");
-    setLoading(false);
-    setStatus(null);
-    setCheckType(null);
-    setResponseTime(null);
-    if (esRef.current) {
-      try {
-        esRef.current.close();
-      } catch (e) {}
-      esRef.current = null;
+  const handleSendRequest = async () => {
+    if (!url) {
+      setError('Please enter a URL');
+      return;
     }
-    setStreaming(false);
-  }, [activeTab]);
 
-  // listen for back/forward navigation and update active tab
-  useEffect(() => {
-    const onPop = () => {
-      setActiveTab(mapPathToTab(window.location.pathname));
-    };
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, []);
-
-  async function postJSON(path, body) {
     setLoading(true);
-    setStatus(null);
-    setCheckType(path === "/api/http" ? "website" : "port");
-    setResponseTime(null);
-    setOutput("Checking...");
-    
-    const startTime = performance.now();
-    
+    setError('');
+    setResponse(null);
+
     try {
-      const res = await fetch(path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      
-      const endTime = performance.now();
-      const elapsed = endTime - startTime;
-      setResponseTime(elapsed.toFixed(0));
-      
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-      }
-      
-      const data = await res.json();
-      
-      // For Quick Check tab, show simple up/down status
-      if (activeTab === "isitdown") {
-        if (path === "/api/http") {
-          if (data.status_code && data.status_code >= 200 && data.status_code < 400) {
-            setStatus('up');
-            setOutput({
-              type: 'website',
-              status: 'up',
-              statusCode: data.status_code,
-              responseTime: elapsed.toFixed(0),
-              details: `Website responded with status ${data.status_code}`
-            });
-          } else {
-            setStatus('down');
-            setOutput({
-              type: 'website',
-              status: 'down',
-              statusCode: data.status_code,
-              responseTime: elapsed.toFixed(0),
-              details: `Website returned status ${data.status_code}`
-            });
-          }
-        } else if (path === "/api/port") {
-          if (data.open) {
-            setStatus('up');
-            setOutput({
-              type: 'port',
-              status: 'up',
-              latency: data.latency_ms,
-              responseTime: elapsed.toFixed(0),
-              details: `Port responded in ${data.latency_ms?.toFixed(2)}ms`
-            });
-          } else {
-            setStatus('down');
-            setOutput({
-              type: 'port',
-              status: 'down',
-              error: data.error,
-              responseTime: elapsed.toFixed(0),
-              details: `Port is closed or unreachable`
-            });
-          }
+      const headersObj = {};
+      headers.forEach(header => {
+        if (header.key.trim()) {
+          headersObj[header.key.trim()] = header.value.trim();
         }
-      } else {
-        // For other tabs, show full output
-        if (data && typeof data.stdout === "string" && data.stdout.includes("PORT")) {
-          const ports = parseNmap(data.stdout);
-          setOutput({ nmapPorts: ports });
-        } else {
-          setOutput(JSON.stringify(data, null, 2));
+      });
+
+      const requestBody = {
+        url,
+        method,
+        headers: headersObj,
+        timeout,
+        verbose,
+      };
+
+      if (body.trim() && ['POST', 'PUT', 'PATCH'].includes(method)) {
+        try {
+          JSON.parse(body);
+          requestBody.body = body;
+        } catch {
+          // If not valid JSON, send as plain text
+          requestBody.body = body;
         }
       }
-    } catch (e) {
-      const endTime = performance.now();
-      const elapsed = endTime - startTime;
-      setResponseTime(elapsed.toFixed(0));
-      setStatus('down');
-      setCheckType(path === "/api/http" ? "website" : "port");
-      setOutput({
-        type: path === "/api/http" ? "website" : "port",
-        status: 'down',
-        error: e.message,
-        responseTime: elapsed.toFixed(0),
-        details: `Failed to connect: ${e.message}`
+
+      const response = await fetch('/api/http', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
       });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.detail || 'Request failed');
+      }
+
+      setResponse(data);
+    } catch (err) {
+      setError(err.message || 'Failed to send request');
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  function parseNmap(raw) {
-    const lines = raw.split("\n");
-    const ports = [];
-    let inTable = false;
-    for (const line of lines) {
-      if (!inTable) {
-        if (line.trim().startsWith("PORT")) {
-          inTable = true;
-        }
-        continue;
-      }
-      const l = line.trim();
-      if (!l) continue;
-      // Expected format: "21/tcp   open  ftp"
-      const parts = l.split(/\s+/);
-      if (parts.length >= 3) {
-        const [portProto, state, service] = parts;
-        const [portStr, proto] = portProto.split("/");
-        const port = Number(portStr);
-        ports.push({ port, proto, state, service });
-      }
-    }
-    return ports;
-  }
+  const addHeader = () => {
+    setHeaders([...headers, { key: '', value: '' }]);
+  };
 
-  function serviceIcon(name) {
-    if (!name) return "UNK";
-    const n = String(name).toUpperCase();
-    const map = {
-      FTP: "FTP",
-      SSH: "SSH",
-      TELNET: "TEL",
-      SMTP: "SMTP",
-      DOMAIN: "DNS",
-      HTTP: "HTTP",
-      HTTPS: "HTTPS",
-      POP3: "POP3",
-      IMAP: "IMAP",
-      MYSQL: "SQL",
-      POSTGRESQL: "PG",
-      REDIS: "RDS",
-      MONGODB: "MDB",
-      RDP: "RDP",
-      VNC: "VNC",
-      SNMP: "SNMP",
-      LDAP: "LDAP",
-    };
-    return map[n] || n.slice(0, 3);
-  }
+  const updateHeader = (index, field, value) => {
+    const newHeaders = [...headers];
+    newHeaders[index][field] = value;
+    setHeaders(newHeaders);
+  };
 
-  function startStream(host, ports) {
-    if (!host) {
-      setOutput("Please enter a host");
-      return;
-    }
-    setStreaming(true);
-    setStreamPorts([]);
-    setStreamBuffer("");
-    const url = `/api/nmap/stream?host=${encodeURIComponent(host)}&top_ports=${ports}`;
-    const es = new EventSource(url);
-    esRef.current = es;
-    
-    es.onmessage = (e) => {
-      const d = e.data;
-      if (!d) return;
-      
-      if (d.startsWith("__DONE__")) {
-        setStreaming(false);
-        try {
-          const payload = JSON.parse(d.slice(9));
-          if (payload.returncode !== 0) {
-            setOutput(`Scan completed with errors:\n${payload.stderr}`);
-          }
-        } catch (err) {
-          // Ignore parse errors
-        }
-        if (esRef.current) {
-          esRef.current.close();
-          esRef.current = null;
-        }
-        return;
-      }
-      
-      if (d.startsWith("__ERROR__")) {
-        setOutput(`Stream error: ${d.slice(10)}`);
-        setStreaming(false);
-        if (esRef.current) {
-          esRef.current.close();
-          esRef.current = null;
-        }
-        return;
-      }
-      
-      // Append to buffer and parse
-      setStreamBuffer((prev) => {
-        const next = prev + (prev ? "\n" : "") + d;
-        const portsParsed = parseNmap(next);
-        if (portsParsed.length > 0) {
-          setStreamPorts(portsParsed);
-        }
-        return next;
-      });
-    };
-    
-    es.onerror = (err) => {
-      setOutput("Stream connection lost");
-      setStreaming(false);
-      if (esRef.current) {
-        esRef.current.close();
-        esRef.current = null;
-      }
-    };
-  }
+  const removeHeader = (index) => {
+    const newHeaders = headers.filter((_, i) => i !== index);
+    setHeaders(newHeaders);
+  };
 
   return (
-    <div className="app">
-      <header className="hero" role="banner">
-        <div className="hero-inner">
-          <h1 className="brand">isitdown.space</h1>
-          <Nav active={activeTab} onChange={setActiveTab} />
-          <p className="tag">Quick checks for websites, servers and services</p>
-        </div>
-      </header>
+    <Box sx={{ maxWidth: 1200, margin: '0 auto' }}>
+      <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600, color: '#1976d2' }}>
+        Curl Tool - HTTP Tester
+      </Typography>
+      
+      <Typography variant="subtitle1" color="text.secondary" paragraph>
+        Send HTTP requests and inspect responses. Perfect for API testing and debugging.
+      </Typography>
 
-      <main className="container">
-        <div>
-          <section className="card">
-            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-              <select
-                className="protocol-select"
-                value={protocol}
-                onChange={(e) => setProtocol(e.target.value)}
-                aria-label="Protocol"
-              >
-                <option value="http">HTTP</option>
-                <option value="https">HTTPS</option>
-              </select>
-              <input
-                className="target"
-                placeholder="example.com or example.com:80"
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && activeTab === 'isitdown') {
-                    const url = target.includes("://") ? target : `${protocol}://${target}`;
-                    postJSON("/api/http", { url, timeout: 10, verbose });
-                  }
-                }}
-                aria-label="Target host or URL"
+      <Card sx={{ mb: 4, boxShadow: 3 }}>
+        <CardContent>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={8}>
+              <TextField
+                fullWidth
+                label="URL"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://api.example.com/endpoint"
+                variant="outlined"
               />
-            </div>
-
-            {activeTab === "isitdown" && (
-              <div className="controls" role="group" aria-label="Quick check tools">
-                <button 
-                  onClick={() => {
-                    const url = target.includes("://") ? target : `${protocol}://${target}`;
-                    postJSON("/api/http", { url, timeout: 10, verbose });
-                  }}
-                  disabled={loading || !target.trim()}
-                  className={loading ? "pulse" : ""}
-                  aria-label="Check if website is up or down"
-                >
-                  {loading ? "Checking..." : "Check Website"}
-                </button>
-                <button
-                  onClick={() => {
-                    let host = target;
-                    let port = 80;
-                    if (target.includes(":")) {
-                      const parts = target.split(":");
-                      host = parts[0];
-                      port = Number(parts[1] || 80);
-                    }
-                    postJSON("/api/port", { host, port, timeout: 5 });
-                  }}
-                  disabled={loading || !target.trim()}
-                  className={loading ? "pulse" : ""}
-                  aria-label="Check port status"
-                >
-                  Check Port
-                </button>
-                <label className="chk">
-                  <input 
-                    type="checkbox" 
-                    checked={verbose} 
-                    onChange={(e) => setVerbose(e.target.checked)} 
-                    aria-label="Show detailed output"
-                  />
-                  Details
-                </label>
-              </div>
-            )}
-
-            {/* Rest of the controls for other tabs remain the same */}
-            {activeTab === "scanner" && (
-              <div className="controls" role="group" aria-label="Port scanner tools">
-                <label className="chk">
-                  Top Ports:
-                  <input
-                    type="number"
-                    min="1"
-                    max="1000"
-                    value={topPorts}
-                    onChange={(e) => setTopPorts(Math.min(1000, Math.max(1, Number(e.target.value) || 100)))}
-                    style={{ width: 80 }}
-                    aria-label="Number of top ports to scan"
-                  />
-                </label>
-                <label className="chk">
-                  Live Stream:
-                  <input
-                    type="checkbox"
-                    checked={liveStream}
-                    onChange={(e) => setLiveStream(e.target.checked)}
-                    aria-label="Enable live streaming results"
-                  />
-                </label>
-                {!liveStream && (
-                  <button 
-                    onClick={() => postJSON("/api/nmap", { host: target, top_ports: topPorts, timeout: 60 })}
-                    disabled={loading || !target.trim()}
-                  >
-                    {loading ? "Scanning..." : "Service Scan"}
-                  </button>
-                )}
-                {liveStream && (
-                  <button
-                    onClick={() => startStream(target, topPorts)}
-                    disabled={streaming || !target.trim()}
-                    className={streaming ? "loading" : ""}
-                    aria-label="Start live port scanning"
-                  >
-                    {streaming ? "Scanning..." : "Live Scan"}
-                  </button>
-                )}
-              </div>
-            )}
-
-            {activeTab === "curl" && (
-              <div className="controls" role="group" aria-label="HTTP tester tools">
-                <select 
-                  value={curlMethod} 
-                  onChange={(e) => setCurlMethod(e.target.value)}
-                  className="method-select"
-                  aria-label="HTTP method"
-                >
-                  <option>GET</option>
-                  <option>POST</option>
-                  <option>PUT</option>
-                  <option>DELETE</option>
-                  <option>HEAD</option>
-                  <option>PATCH</option>
-                </select>
-                <input
-                  placeholder='{"Authorization": "Bearer token", "Content-Type": "application/json"}'
-                  value={curlHeaders}
-                  onChange={(e) => setCurlHeaders(e.target.value)}
-                  className="target"
-                  style={{ flex: 1 }}
-                  aria-label="HTTP headers in JSON format"
-                />
-                <button
-                  onClick={() => {
-                    let headers = {};
-                    try {
-                      headers = curlHeaders ? JSON.parse(curlHeaders) : {};
-                    } catch (e) {
-                      setOutput("Invalid headers JSON");
-                      return;
-                    }
-                    const url = target.includes("://") ? target : `${protocol}://${target}`;
-                    postJSON("/api/http", { url, method: curlMethod, timeout: 15, verbose: true, headers });
-                  }}
-                  disabled={loading || !target.trim()}
-                  aria-label="Send HTTP request like curl or Postman"
-                >
-                  {loading ? "Sending..." : "Send Request"}
-                </button>
-              </div>
-            )}
-          </section>
-
-          <section className="card results" style={{ marginTop: 24 }} aria-labelledby="results-heading">
-            <h2 id="results-heading" className="visually-hidden">Results</h2>
+            </Grid>
             
-            {/* Aesthetic Status Display for Quick Check */}
-            {activeTab === "isitdown" && (status || loading) ? (
-              <div className="status-container">
-                {loading ? (
-                  <div className="status-loading">
-                    <div className="pulse-ring"></div>
-                    <div className="loading-spinner"></div>
-                    <div className="loading-text">Checking {checkType}...</div>
-                  </div>
-                ) : status === 'up' ? (
-                  <div className="status-up animate-fadeIn">
-                    <div className="status-icon success">
-                      <svg className="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
-                        <circle className="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
-                        <path className="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
-                      </svg>
-                    </div>
-                    <div className="status-content">
-                      <h3 className="status-title">✓ {output.type === 'website' ? 'Website is UP' : 'Port is OPEN'}</h3>
-                      <div className="status-details">
-                        <div className="status-metric">
-                          <span className="metric-label">Response Time:</span>
-                          <span className="metric-value">{responseTime}ms</span>
-                        </div>
-                        {output.statusCode && (
-                          <div className="status-metric">
-                            <span className="metric-label">Status Code:</span>
-                            <span className="metric-value status-code">{output.statusCode}</span>
-                          </div>
-                        )}
-                        {output.latency && (
-                          <div className="status-metric">
-                            <span className="metric-label">Latency:</span>
-                            <span className="metric-value">{output.latency}ms</span>
-                          </div>
-                        )}
-                        <div className="status-note">{output.details}</div>
-                      </div>
-                    </div>
-                  </div>
-                ) : status === 'down' ? (
-                  <div className="status-down animate-fadeIn">
-                    <div className="status-icon error">
-                      <svg className="xmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
-                        <circle className="xmark-circle" cx="26" cy="26" r="25" fill="none"/>
-                        <path className="xmark-path" fill="none" d="M16 16l20 20 M36 16l-20 20"/>
-                      </svg>
-                    </div>
-                    <div className="status-content">
-                      <h3 className="status-title">✗ {output.type === 'website' ? 'Website is DOWN' : 'Port is CLOSED'}</h3>
-                      <div className="status-details">
-                        <div className="status-metric">
-                          <span className="metric-label">Response Time:</span>
-                          <span className="metric-value">{responseTime}ms</span>
-                        </div>
-                        {output.statusCode && (
-                          <div className="status-metric">
-                            <span className="metric-label">Status Code:</span>
-                            <span className="metric-value status-code">{output.statusCode}</span>
-                          </div>
-                        )}
-                        <div className="status-note">{output.details}</div>
-                        {output.error && (
-                          <div className="status-error">
-                            <small>Error: {output.error}</small>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            ) : activeTab === "scanner" && liveStream ? (
-              <div className="port-list">
-                {streamPorts.length > 0 ? (
-                  streamPorts.map((p) => (
-                    <div key={`${p.port}/${p.proto}`} className="port-item">
-                      <div className="port-badge">
-                        <span className={`dot ${p.state.toLowerCase()}`} />
-                        <strong>{p.port}</strong>
-                        <small>/{p.proto}</small>
-                      </div>
-                      <div className="port-meta">
-                        <div className="service-name">
-                          <span className="badge-abbr">{serviceIcon(p.service)}</span>
-                          {p.service}
-                        </div>
-                        <div className="service-state">{p.state.toUpperCase()}</div>
-                      </div>
-                    </div>
-                  ))
-                ) : streaming ? (
-                  <div style={{ color: "var(--muted)", textAlign: "center", padding: "40px" }}>
-                    <div style={{ marginBottom: "16px" }}>Scanning ports...</div>
-                    <div className="loading" style={{ 
-                      height: "4px", 
-                      width: "200px", 
-                      margin: "0 auto",
-                      borderRadius: "2px" 
-                    }}></div>
-                  </div>
-                ) : (
-                  <div style={{ color: "var(--muted)", textAlign: "center", padding: "40px" }}>
-                    Click "Live Scan" to start scanning
-                  </div>
-                )}
-              </div>
-            ) : loading ? (
-              <div style={{ color: "var(--muted)", textAlign: "center", padding: "40px" }}>
-                <div style={{ marginBottom: "16px" }}>Processing request...</div>
-                <div className="loading" style={{ 
-                  height: "4px", 
-                  width: "200px", 
-                  margin: "0 auto",
-                  borderRadius: "2px" 
-                }}></div>
-              </div>
-            ) : typeof output === "string" ? (
-              <pre>{output}</pre>
-            ) : output && output.nmapPorts ? (
-              <div className="port-list">
-                {output.nmapPorts.length > 0 ? (
-                  output.nmapPorts.map((p) => (
-                    <div key={`${p.port}/${p.proto}`} className="port-item">
-                      <div className="port-badge">
-                        <span className="dot open" />
-                        <strong>{p.port}</strong>
-                        <small>/{p.proto}</small>
-                      </div>
-                      <div className="port-meta">
-                        <div className="service-name">
-                          <span className="badge-abbr">{serviceIcon(p.service)}</span>
-                          {p.service}
-                        </div>
-                        <div className="service-state">{p.state.toUpperCase()}</div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div style={{ color: "var(--muted)", textAlign: "center", padding: "20px" }}>
-                    No open ports found in the scan
-                  </div>
-                )}
-              </div>
-            ) : (
-              <pre>{JSON.stringify(output, null, 2)}</pre>
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth variant="outlined">
+                <InputLabel>Method</InputLabel>
+                <Select
+                  value={method}
+                  onChange={(e) => setMethod(e.target.value)}
+                  label="Method"
+                >
+                  <MenuItem value="GET">GET</MenuItem>
+                  <MenuItem value="POST">POST</MenuItem>
+                  <MenuItem value="PUT">PUT</MenuItem>
+                  <MenuItem value="DELETE">DELETE</MenuItem>
+                  <MenuItem value="PATCH">PATCH</MenuItem>
+                  <MenuItem value="HEAD">HEAD</MenuItem>
+                  <MenuItem value="OPTIONS">OPTIONS</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom>Request Headers</Typography>
+              {headers.map((header, index) => (
+                <Grid container spacing={2} key={index} sx={{ mb: 2 }}>
+                  <Grid item xs={5}>
+                    <TextField
+                      fullWidth
+                      placeholder="Header Name"
+                      value={header.key}
+                      onChange={(e) => updateHeader(index, 'key', e.target.value)}
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={5}>
+                    <TextField
+                      fullWidth
+                      placeholder="Header Value"
+                      value={header.value}
+                      onChange={(e) => updateHeader(index, 'value', e.target.value)}
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={2}>
+                    <Button
+                      color="error"
+                      onClick={() => removeHeader(index)}
+                      size="small"
+                    >
+                      Remove
+                    </Button>
+                  </Grid>
+                </Grid>
+              ))}
+              <Button onClick={addHeader} variant="outlined" size="small">
+                Add Header
+              </Button>
+            </Grid>
+
+            {['POST', 'PUT', 'PATCH'].includes(method) && (
+              <Grid item xs={12}>
+                <Typography variant="h6" gutterBottom>Request Body</Typography>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={6}
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  placeholder='{"key": "value"}'
+                  variant="outlined"
+                />
+              </Grid>
             )}
-          </section>
-        </div>
 
-        <aside>
-          <section className="card">
-            <h3 style={{ marginTop: 0 }}>Quick Tips</h3>
-            <p style={{ color: "var(--muted)", marginBottom: 0 }}>
-              Use full URLs for HTTP (https://). Service scans are TCP connect only.
-            </p>
-          </section>
-        </aside>
-      </main>
+            <Grid item xs={12}>
+              <Grid container spacing={3} alignItems="center">
+                <Grid item xs={12} md={4}>
+                  <Typography gutterBottom>Timeout: {timeout} seconds</Typography>
+                  <Slider
+                    value={timeout}
+                    onChange={(e, newValue) => setTimeout(newValue)}
+                    min={1}
+                    max={30}
+                    step={1}
+                    valueLabelDisplay="auto"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={verbose}
+                        onChange={(e) => setVerbose(e.target.checked)}
+                      />
+                    }
+                    label="Verbose Response"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="large"
+                    onClick={handleSendRequest}
+                    disabled={loading}
+                    fullWidth
+                  >
+                    {loading ? <CircularProgress size={24} /> : 'Send Request'}
+                  </Button>
+                </Grid>
+              </Grid>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
 
-      <footer className="footer">Built by Abraham</footer>
-    </div>
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
+      {response && (
+        <Card sx={{ boxShadow: 3 }}>
+          <CardContent>
+            <Typography variant="h5" gutterBottom sx={{ color: '#1976d2' }}>
+              Response
+            </Typography>
+            
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <Box sx={{ p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                  <Typography variant="subtitle1" gutterBottom>
+                    Status Code: <Chip 
+                      label={response.status_code} 
+                      color={response.status_code < 400 ? "success" : "error"}
+                      size="small"
+                    />
+                  </Typography>
+                </Box>
+              </Grid>
+
+              <Grid item xs={12}>
+                <Accordion>
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Typography>Response Headers</Typography>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell><strong>Header</strong></TableCell>
+                            <TableCell><strong>Value</strong></TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {Object.entries(response.headers || {}).map(([key, value]) => (
+                            <TableRow key={key}>
+                              <TableCell>{key}</TableCell>
+                              <TableCell>{value}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </AccordionDetails>
+                </Accordion>
+              </Grid>
+
+              <Grid item xs={12}>
+                <Accordion defaultExpanded>
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Typography>Response Body</Typography>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Box sx={{ 
+                      p: 2, 
+                      bgcolor: '#f8f9fa', 
+                      borderRadius: 1,
+                      maxHeight: 400,
+                      overflow: 'auto',
+                      fontFamily: 'monospace',
+                      fontSize: '0.9rem'
+                    }}>
+                      <pre style={{ margin: 0 }}>
+                        {typeof response.body === 'string' 
+                          ? response.body 
+                          : JSON.stringify(response.body, null, 2)}
+                      </pre>
+                    </Box>
+                  </AccordionDetails>
+                </Accordion>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+      )}
+    </Box>
+  );
+};
+
+// Port Scanner Component
+const PortScanner = () => {
+  const [clientIP, setClientIP] = useState('');
+  const [port, setPort] = useState('80');
+  const [loading, setLoading] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+  const [scanHistory, setScanHistory] = useState([]);
+
+  const commonPorts = [
+    { name: 'FTP', port: 21 },
+    { name: 'SSH', port: 22 },
+    { name: 'Telnet', port: 23 },
+    { name: 'SMTP', port: 25 },
+    { name: 'DNS', port: 53 },
+    { name: 'HTTP', port: 80 },
+    { name: 'POP3', port: 110 },
+    { name: 'HTTPS', port: 443 },
+    { name: 'MySQL', port: 3306 },
+    { name: 'RDP', port: 3389 },
+  ];
+
+  const otherApps = [
+    { name: 'Minecraft', port: 25565 },
+    { name: 'Steam', port: 27015 },
+    { name: 'TeamSpeak', port: 9987 },
+    { name: 'Discord Voice', port: 64738 },
+  ];
+
+  useEffect(() => {
+    fetchClientIP();
+  }, []);
+
+  const fetchClientIP = async () => {
+    try {
+      const response = await fetch('/api/client-ip');
+      const data = await response.json();
+      setClientIP(data.ip);
+    } catch (err) {
+      console.error('Error fetching client IP:', err);
+      setClientIP('Unable to detect IP');
+    }
+  };
+
+  const checkPort = async () => {
+    if (!port || isNaN(port)) {
+      setError('Please enter a valid port number');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setResult(null);
+
+    try {
+      const response = await fetch('/api/port', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          host: clientIP,
+          port: parseInt(port),
+          timeout: 5
+        }),
+      });
+
+      const data = await response.json();
+      
+      const scanResult = {
+        timestamp: new Date().toLocaleTimeString(),
+        ip: clientIP,
+        port: parseInt(port),
+        ...data
+      };
+
+      setResult(scanResult);
+      
+      setScanHistory(prev => [scanResult, ...prev.slice(0, 4)]);
+    } catch (err) {
+      setError('Failed to check port. Please try again.');
+      console.error('Error checking port:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const quickScanPort = async (quickPort) => {
+    setPort(quickPort.toString());
+    setTimeout(() => checkPort(), 100);
+  };
+
+  const scanMultiplePorts = async () => {
+    if (!clientIP) {
+      setError('Unable to detect your IP address');
+      return;
+    }
+
+    setScanning(true);
+    setError('');
+    const results = [];
+
+    for (const portInfo of commonPorts.slice(0, 5)) {
+      try {
+        const response = await fetch('/api/port', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            host: clientIP,
+            port: portInfo.port,
+            timeout: 3
+          }),
+        });
+        
+        const data = await response.json();
+        results.push({
+          name: portInfo.name,
+          port: portInfo.port,
+          ...data,
+          timestamp: new Date().toLocaleTimeString()
+        });
+      } catch (err) {
+        console.error(`Error scanning port ${portInfo.port}:`, err);
+      }
+    }
+
+    setScanHistory(results);
+    setScanning(false);
+  };
+
+  return (
+    <Box sx={{ maxWidth: 1200, margin: '0 auto', p: 3 }}>
+      <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600, color: '#1976d2' }}>
+        Port Scanner
+      </Typography>
+      
+      <Typography variant="subtitle1" color="text.secondary" paragraph>
+        A free utility for remotely verifying if a port is open or closed. Useful for verifying port forwarding and checking if a server is running or a firewall/ISP is blocking certain ports.
+      </Typography>
+
+      <Card sx={{ mb: 4, boxShadow: 3 }}>
+        <CardContent>
+          <Grid container spacing={3} alignItems="center">
+            <Grid item xs={12} md={4}>
+              <Typography variant="h6" gutterBottom>
+                <PublicIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
+                Your IP
+              </Typography>
+              <Paper 
+                sx={{ 
+                  p: 2, 
+                  bgcolor: '#f5f5f5',
+                  fontFamily: 'monospace',
+                  fontSize: '1.1rem',
+                  fontWeight: 'bold'
+                }}
+              >
+                {clientIP || 'Detecting...'}
+              </Paper>
+              <Button 
+                size="small" 
+                onClick={fetchClientIP}
+                sx={{ mt: 1 }}
+              >
+                Refresh IP
+              </Button>
+            </Grid>
+            
+            <Grid item xs={12} md={4}>
+              <Typography variant="h6" gutterBottom>
+                Port to Check
+              </Typography>
+              <TextField
+                fullWidth
+                type="number"
+                value={port}
+                onChange={(e) => setPort(e.target.value)}
+                placeholder="Enter port number (1-65535)"
+                InputProps={{
+                  inputProps: { min: 1, max: 65535 }
+                }}
+                variant="outlined"
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={4} sx={{ textAlign: 'center' }}>
+              <Button
+                variant="contained"
+                color="primary"
+                size="large"
+                onClick={checkPort}
+                disabled={loading || !clientIP}
+                sx={{ 
+                  px: 4, 
+                  py: 1.5,
+                  fontSize: '1.1rem'
+                }}
+              >
+                {loading ? <CircularProgress size={24} /> : 'Check Port'}
+              </Button>
+              
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={scanMultiplePorts}
+                disabled={scanning || !clientIP}
+                sx={{ mt: 2, ml: 2 }}
+              >
+                {scanning ? 'Scanning...' : 'Quick Scan'}
+              </Button>
+            </Grid>
+          </Grid>
+
+          {error && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {error}
+            </Alert>
+          )}
+
+          {result && (
+            <Box sx={{ mt: 3, p: 2, bgcolor: '#f8f9fa', borderRadius: 1 }}>
+              <Typography variant="h6" gutterBottom>
+                Scan Result
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6} md={3}>
+                  <Typography variant="body2" color="text.secondary">Port</Typography>
+                  <Typography variant="h6">{result.port}</Typography>
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Typography variant="body2" color="text.secondary">Status</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    {result.open ? (
+                      <>
+                        <CheckCircleIcon sx={{ color: 'green', mr: 1 }} />
+                        <Typography variant="h6" sx={{ color: 'green' }}>OPEN</Typography>
+                      </>
+                    ) : (
+                      <>
+                        <CancelIcon sx={{ color: 'red', mr: 1 }} />
+                        <Typography variant="h6" sx={{ color: 'red' }}>CLOSED</Typography>
+                      </>
+                    )}
+                  </Box>
+                </Grid>
+                {result.open && result.latency_ms && (
+                  <Grid item xs={6} md={3}>
+                    <Typography variant="body2" color="text.secondary">Latency</Typography>
+                    <Typography variant="h6">{result.latency_ms.toFixed(2)} ms</Typography>
+                  </Grid>
+                )}
+                {!result.open && result.error && (
+                  <Grid item xs={6} md={3}>
+                    <Typography variant="body2" color="text.secondary">Error</Typography>
+                    <Typography variant="body1">{result.error}</Typography>
+                  </Grid>
+                )}
+                <Grid item xs={6} md={3}>
+                  <Typography variant="body2" color="text.secondary">Time</Typography>
+                  <Typography variant="body1">{result.timestamp}</Typography>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+        </CardContent>
+      </Card>
+
+      <Grid container spacing={4}>
+        <Grid item xs={12} md={6}>
+          <Card sx={{ boxShadow: 2 }}>
+            <CardContent>
+              <Typography variant="h5" gutterBottom sx={{ color: '#1976d2' }}>
+                Common Ports
+              </Typography>
+              <Typography variant="body2" color="text.secondary" paragraph>
+                Click any port to quickly test it
+              </Typography>
+              
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                      <TableCell><strong>Service</strong></TableCell>
+                      <TableCell><strong>Port</strong></TableCell>
+                      <TableCell align="right"><strong>Action</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {commonPorts.map((row) => (
+                      <TableRow 
+                        key={row.port}
+                        hover
+                        sx={{ cursor: 'pointer' }}
+                        onClick={() => quickScanPort(row.port)}
+                      >
+                        <TableCell>{row.name}</TableCell>
+                        <TableCell>{row.port}</TableCell>
+                        <TableCell align="right">
+                          <Button 
+                            size="small" 
+                            variant="outlined"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              quickScanPort(row.port);
+                            }}
+                          >
+                            Test
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <Card sx={{ boxShadow: 2 }}>
+            <CardContent>
+              <Typography variant="h5" gutterBottom sx={{ color: '#1976d2' }}>
+                Other Applications
+              </Typography>
+              <Typography variant="body2" color="text.secondary" paragraph>
+                Popular application ports
+              </Typography>
+              
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                      <TableCell><strong>Application</strong></TableCell>
+                      <TableCell><strong>Port</strong></TableCell>
+                      <TableCell align="right"><strong>Action</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {otherApps.map((row) => (
+                      <TableRow 
+                        key={row.port}
+                        hover
+                        sx={{ cursor: 'pointer' }}
+                        onClick={() => quickScanPort(row.port)}
+                      >
+                        <TableCell>{row.name}</TableCell>
+                        <TableCell>{row.port}</TableCell>
+                        <TableCell align="right">
+                          <Button 
+                            size="small" 
+                            variant="outlined"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              quickScanPort(row.port);
+                            }}
+                          >
+                            Test
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {scanHistory.length > 0 && (
+        <Card sx={{ mt: 4, boxShadow: 2 }}>
+          <CardContent>
+            <Typography variant="h5" gutterBottom sx={{ color: '#1976d2' }}>
+              Recent Scans
+            </Typography>
+            
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                    <TableCell><strong>Time</strong></TableCell>
+                    <TableCell><strong>Port</strong></TableCell>
+                    <TableCell><strong>Status</strong></TableCell>
+                    <TableCell><strong>Latency</strong></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {scanHistory.map((scan, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{scan.timestamp}</TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={scan.name ? `${scan.name} (${scan.port})` : `Port ${scan.port}`}
+                          variant="outlined"
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {scan.open ? (
+                          <Chip 
+                            icon={<CheckCircleIcon />}
+                            label="OPEN"
+                            color="success"
+                            size="small"
+                          />
+                        ) : (
+                          <Chip 
+                            icon={<CancelIcon />}
+                            label="CLOSED"
+                            color="error"
+                            size="small"
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {scan.open ? `${scan.latency_ms?.toFixed(2)} ms` : '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card sx={{ mt: 4, bgcolor: '#f8f9fa', boxShadow: 1 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom sx={{ color: '#1976d2' }}>
+            About Port Scanning
+          </Typography>
+          <Typography variant="body2" paragraph>
+            This tool helps you check if specific ports on your network are open or closed. 
+            It's useful for:
+          </Typography>
+          <ul>
+            <li><Typography variant="body2">Verifying port forwarding configuration</Typography></li>
+            <li><Typography variant="body2">Checking if a server service is running</Typography></li>
+            <li><Typography variant="body2">Testing firewall rules</Typography></li>
+            <li><Typography variant="body2">Diagnosing network connectivity issues</Typography></li>
+            <li><Typography variant="body2">Ensuring game servers are accessible</Typography></li>
+          </ul>
+          <Typography variant="body2" sx={{ fontStyle: 'italic', mt: 2 }}>
+            Note: Some ISPs or firewalls may block port scanning. Results may vary depending on your network configuration.
+          </Typography>
+        </CardContent>
+      </Card>
+    </Box>
+  );
+};
+
+// Status Checker Component
+const StatusChecker = () => {
+  const [url, setUrl] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+
+  const checkStatus = async () => {
+    if (!url) {
+      setError('Please enter a URL');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setResult(null);
+
+    try {
+      const response = await fetch('/api/http', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: url.startsWith('http') ? url : `https://${url}`,
+          method: 'GET',
+          timeout: 10,
+          verbose: false
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.detail || 'Check failed');
+      }
+
+      setResult({
+        url,
+        statusCode: data.status_code,
+        timestamp: new Date().toLocaleString(),
+        headers: data.headers,
+        bodyPreview: data.body?.substring(0, 200) || ''
+      });
+    } catch (err) {
+      setError(err.message || 'Failed to check status');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Box sx={{ maxWidth: 1200, margin: '0 auto' }}>
+      <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600, color: '#1976d2' }}>
+        Status Checker
+      </Typography>
+      
+      <Typography variant="subtitle1" color="text.secondary" paragraph>
+        Quickly check if a website or server is up and running.
+      </Typography>
+
+      <Card sx={{ mb: 4, boxShadow: 3 }}>
+        <CardContent>
+          <Grid container spacing={3} alignItems="center">
+            <Grid item xs={12} md={8}>
+              <TextField
+                fullWidth
+                label="Website URL"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="example.com or https://example.com"
+                variant="outlined"
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={4}>
+              <Button
+                variant="contained"
+                color="primary"
+                size="large"
+                onClick={checkStatus}
+                disabled={loading}
+                fullWidth
+                sx={{ py: 1.5 }}
+              >
+                {loading ? <CircularProgress size={24} /> : 'Check Status'}
+              </Button>
+            </Grid>
+          </Grid>
+
+          {error && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {error}
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      {result && (
+        <Card sx={{ boxShadow: 3 }}>
+          <CardContent>
+            <Typography variant="h5" gutterBottom sx={{ color: '#1976d2' }}>
+              Status Result
+            </Typography>
+            
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <Box sx={{ p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                  <Typography variant="h6" gutterBottom>
+                    URL: {result.url}
+                  </Typography>
+                  <Typography variant="body1">
+                    Checked at: {result.timestamp}
+                  </Typography>
+                </Box>
+              </Grid>
+
+              <Grid item xs={12}>
+                <Box sx={{ 
+                  p: 3, 
+                  borderRadius: 1,
+                  border: '2px solid',
+                  borderColor: result.statusCode < 400 ? 'success.main' : 'error.main',
+                  bgcolor: result.statusCode < 400 ? 'success.light' : 'error.light'
+                }}>
+                  <Grid container alignItems="center" spacing={2}>
+                    <Grid item>
+                      {result.statusCode < 400 ? (
+                        <CheckCircleIcon sx={{ fontSize: 60, color: 'success.main' }} />
+                      ) : (
+                        <CancelIcon sx={{ fontSize: 60, color: 'error.main' }} />
+                      )}
+                    </Grid>
+                    <Grid item>
+                      <Typography variant="h4">
+                        Status: {result.statusCode < 400 ? 'UP' : 'DOWN'}
+                      </Typography>
+                      <Typography variant="h6">
+                        HTTP Status: {result.statusCode}
+                      </Typography>
+                    </Grid>
+                  </Grid>
+                </Box>
+              </Grid>
+
+              {result.headers && (
+                <Grid item xs={12}>
+                  <Accordion>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                      <Typography>Response Headers</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                      <TableContainer>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell><strong>Header</strong></TableCell>
+                              <TableCell><strong>Value</strong></TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {Object.entries(result.headers).slice(0, 10).map(([key, value]) => (
+                              <TableRow key={key}>
+                                <TableCell>{key}</TableCell>
+                                <TableCell>{value}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </AccordionDetails>
+                  </Accordion>
+                </Grid>
+              )}
+            </Grid>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card sx={{ mt: 4, bgcolor: '#f8f9fa', boxShadow: 1 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom sx={{ color: '#1976d2' }}>
+            Common Status Codes
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={3}>
+              <Paper sx={{ p: 2, textAlign: 'center', bgcolor: '#e8f5e9' }}>
+                <Typography variant="h6" color="success.main">200 OK</Typography>
+                <Typography variant="body2">Successful request</Typography>
+              </Paper>
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <Paper sx={{ p: 2, textAlign: 'center', bgcolor: '#fff3e0' }}>
+                <Typography variant="h6" color="warning.main">301/302</Typography>
+                <Typography variant="body2">Redirect</Typography>
+              </Paper>
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <Paper sx={{ p: 2, textAlign: 'center', bgcolor: '#ffebee' }}>
+                <Typography variant="h6" color="error.main">404</Typography>
+                <Typography variant="body2">Not Found</Typography>
+              </Paper>
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <Paper sx={{ p: 2, textAlign: 'center', bgcolor: '#ffebee' }}>
+                <Typography variant="h6" color="error.main">500</Typography>
+                <Typography variant="body2">Server Error</Typography>
+              </Paper>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+    </Box>
+  );
+};
+
+// Main App Component
+function App() {
+  const [mobileOpen, setMobileOpen] = React.useState(false);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
+  };
+
+  const menuItems = [
+    { text: 'Home', path: '/', icon: <HomeIcon /> },
+    { text: 'Curl Tool', path: '/curl', icon: <TerminalIcon /> },
+    { text: 'Port Scanner', path: '/port-scan', icon: <NetworkCheckIcon /> },
+    { text: 'Status Checker', path: '/status', icon: <SearchIcon /> },
+  ];
+
+  const drawer = (
+    <List>
+      {menuItems.map((item) => (
+        <ListItem
+          button
+          key={item.text}
+          component={Link}
+          to={item.path}
+          onClick={() => setMobileOpen(false)}
+        >
+          <Box sx={{ mr: 2 }}>{item.icon}</Box>
+          <ListItemText primary={item.text} />
+        </ListItem>
+      ))}
+    </List>
+  );
+
+  return (
+    <Router>
+      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <AppBar position="static" sx={{ bgcolor: '#071129' }}>
+          <Toolbar>
+            {isMobile && (
+              <IconButton
+                color="inherit"
+                aria-label="open drawer"
+                edge="start"
+                onClick={handleDrawerToggle}
+                sx={{ mr: 2 }}
+              >
+                <MenuIcon />
+              </IconButton>
+            )}
+            
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 700 }}>
+              <Link to="/" style={{ color: 'white', textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
+                <Box component="span" sx={{ 
+                  bgcolor: '#1976d2', 
+                  px: 1.5, 
+                  py: 0.5, 
+                  borderRadius: 1,
+                  mr: 1 
+                }}>
+                  Isitdown?
+                </Box>
+              </Link>
+            </Typography>
+
+            {!isMobile && (
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                {menuItems.map((item) => (
+                  <Button
+                    key={item.text}
+                    color="inherit"
+                    component={Link}
+                    to={item.path}
+                    startIcon={item.icon}
+                    sx={{ fontWeight: 500 }}
+                  >
+                    {item.text}
+                  </Button>
+                ))}
+              </Box>
+            )}
+          </Toolbar>
+        </AppBar>
+
+        <Drawer
+          variant="temporary"
+          anchor="left"
+          open={mobileOpen}
+          onClose={handleDrawerToggle}
+          ModalProps={{ keepMounted: true }}
+          sx={{
+            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: 240 },
+          }}
+        >
+          {drawer}
+        </Drawer>
+
+        <Box component="main" sx={{ flexGrow: 1, py: 4, bgcolor: '#f5f7fa' }}>
+          <Container maxWidth="xl">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/curl" element={<CurlTool />} />
+              <Route path="/port-scan" element={<PortScanner />} />
+              <Route path="/status" element={<StatusChecker />} />
+            </Routes>
+          </Container>
+        </Box>
+
+        <Box
+          component="footer"
+          sx={{
+            py: 3,
+            px: 2,
+            mt: 'auto',
+            backgroundColor: '#071129',
+            color: 'white',
+          }}
+        >
+          <Container maxWidth="lg">
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Typography variant="h6" gutterBottom sx={{ color: 'white' }}>
+                  Isitdown?
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                  A free online toolkit for developers, network administrators, and IT professionals.
+                  Check website status, scan ports, and test HTTP requests with our easy-to-use tools.
+                </Typography>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Typography variant="h6" gutterBottom sx={{ color: 'white' }}>
+                  Quick Links
+                </Typography>
+                <Grid container spacing={1}>
+                  {menuItems.map((item) => (
+                    <Grid item xs={6} key={item.text}>
+                      <Link 
+                        to={item.path} 
+                        style={{ 
+                          color: 'rgba(255,255,255,0.7)', 
+                          textDecoration: 'none',
+                          fontSize: '0.9rem'
+                        }}
+                      >
+                        {item.text}
+                      </Link>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Grid>
+            </Grid>
+            <Divider sx={{ my: 3, borderColor: 'rgba(255,255,255,0.1)' }} />
+            <Typography variant="body2" align="center" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+              © {new Date().getFullYear()} Isitdown? - Free Online Service Checker. All tools are free to use.
+            </Typography>
+          </Container>
+        </Box>
+      </Box>
+    </Router>
   );
 }
+
+export default App;

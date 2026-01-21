@@ -47,6 +47,13 @@ async def ip_rate_limit(request: Request, call_next):
         return JSONResponse({"error": "rate limit exceeded"}, status_code=429)
     return await call_next(request)
 
+# New endpoint to get client IP
+@app.get("/api/client-ip")
+async def get_client_ip(request: Request):
+    """Get the client's IP address"""
+    client_host = request.client.host
+    return {"ip": client_host}
+
 @app.post("/api/http")
 async def do_http(target: dict):
     """
@@ -236,7 +243,7 @@ def render_index(route: str):
     # defaults
     meta = {
         "title": "Isitdown? - Free Online Service Checker, Port Scanner & HTTP Tester",
-        "description": "Free online website checker, port scanner, HTTP tester, and service monitor. Check if websites are down, scan ports with online nmap, test APIs with curl-like tool. No installation required.",
+        "description": "Free online website checker, port scanner, HTTP tester. Check if websites are down, scan ports with online nmap, test APIs with curl-like tool. No installation required.",
         "og_title": "Isitdown? - Free Online Service Checker & Port Scanner",
         "og_description": "Check if websites are down, scan ports with online nmap tool, test HTTP requests with curl-like interface. Free and easy to use.",
         "canonical": "https://isitdown.space/",
@@ -305,4 +312,3 @@ async def status_page():
 
 # Serve built React frontend (vite build output) - mount last so API routes take precedence
 app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="static")
-
