@@ -175,6 +175,70 @@ export default function App() {
     return ports;
   }
 
+  function ServiceCard({ name, protocol, domain }) {
+    const [status, setStatus] = useState(null);
+    const [loading, setLoading] = useState(false);
+  
+    const checkService = async () => {
+      setLoading(true);
+      setStatus(null);
+      
+      try {
+        const res = await fetch("/api/http", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            url: `${protocol}://${domain}`, 
+            timeout: 10, 
+            verbose: false 
+          }),
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          setStatus(data.status_code >= 200 && data.status_code < 400 ? 'up' : 'down');
+        } else {
+          setStatus('down');
+        }
+      } catch (e) {
+        setStatus('down');
+      } finally {
+        setLoading(false);
+      }
+    };
+  
+    return (
+      <div className={`service-card ${status}`} onClick={checkService}>
+        <div className="service-icon">
+          {loading ? (
+            <div className="service-loading"></div>
+          ) : status === 'up' ? (
+            <span className="status-dot up"></span>
+          ) : status === 'down' ? (
+            <span className="status-dot down"></span>
+          ) : (
+            <span className="status-dot idle"></span>
+          )}
+        </div>
+        <div className="service-info">
+          <div className="service-name">{name}</div>
+          <div className="service-domain">{domain}</div>
+        </div>
+        <button 
+          className="service-check-btn" 
+          onClick={(e) => {
+            e.stopPropagation();
+            checkService();
+          }}
+          disabled={loading}
+          aria-label={`Check ${name} status`}
+        >
+          {loading ? 'Checking...' : 'Check'}
+        </button>
+      </div>
+    );
+  }
+
   function serviceIcon(name) {
     if (!name) return "UNK";
     const n = String(name).toUpperCase();
@@ -595,6 +659,30 @@ export default function App() {
           </section>
         </aside>
       </main>
+
+    
+
+<section className="popular-services">
+  <h3>Popular Services Quick Check</h3>
+  <div className="services-grid">
+    {/* Social Media */}
+    <ServiceCard name="Instagram" protocol="https" domain="instagram.com" />
+    <ServiceCard name="YouTube" protocol="https" domain="youtube.com" />
+    <ServiceCard name="X (Twitter)" protocol="https" domain="twitter.com" />
+    
+    {/* Telecom */}
+    <ServiceCard name="Jio" protocol="https" domain="jio.com" />
+    <ServiceCard name="Airtel" protocol="https" domain="airtel.in" />
+    <ServiceCard name="VI Vodafone Idea" protocol="https" domain="myvi.in" />
+    
+    {/* Banking & Finance */}
+    <ServiceCard name="SBI" protocol="https" domain="onlinesbi.sbi" />
+    <ServiceCard name="UPI" protocol="https" domain="upi.org.in" />
+    
+    {/* AI & Tech */}
+    <ServiceCard name="OpenAI" protocol="https" domain="openai.com" />
+  </div>
+</section>
 
       <footer className="footer">Built by Abraham</footer>
     </div>
