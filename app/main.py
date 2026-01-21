@@ -8,9 +8,191 @@ import socket
 import shutil
 import subprocess
 import time
+import sqlite3
+from datetime import datetime, timedelta
 from typing import Optional
+import aioschedule
 
 app = FastAPI(title="Isitdown? API")  # Changed from "isitdown.space API"
+
+# Database setup for monitoring
+def init_monitoring_db():
+    conn = sqlite3.connect('monitoring.db')
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS service_checks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            service_name TEXT NOT NULL,
+            domain TEXT NOT NULL,
+            timestamp DATETIME NOT NULL,
+            status_code INTEGER,
+            response_time FLOAT,
+            is_up BOOLEAN,
+            error_message TEXT
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS service_stats (
+            service_name TEXT PRIMARY KEY,
+            total_checks INTEGER DEFAULT 0,
+            successful_checks INTEGER DEFAULT 0,
+            total_response_time FLOAT DEFAULT 0,
+            last_check DATETIME,
+            last_status BOOLEAN
+        )
+    ''')
+    c.execute('''
+        CREATE INDEX IF NOT EXISTS idx_service_time 
+        ON service_checks (service_name, timestamp)
+    ''')
+    conn.commit()
+    conn.close()
+
+init_monitoring_db()
+
+# List of services to monitor
+MONITORED_SERVICES = [
+    {"name": "Instagram", "domain": "instagram.com"},
+    {"name": "YouTube", "domain": "youtube.com"},
+    {"name": "Twitter", "domain": "twitter.com"},
+    {"name": "Jio", "domain": "jio.com"},
+    {"name": "Airtel", "domain": "airtel.in"},
+    {"name": "VI Vodafone Idea", "domain": "myvi.in"},
+    {"name": "SBI", "domain": "onlinesbi.sbi"},
+    {"name": "UPI", "domain": "upi.org.in"},
+    {"name": "OpenAI", "domain": "openai.com"},
+]
+
+async def check_single_service(service):
+    """Check a single service and store results"""
+    try:
+        url = f"https://{service['domain']}"
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            start_time = time.time()
+            response = await client.get(url, headers={
+                "User-Agent": "IsItDown-Monitor/1.0"
+            })
+            response_time = (time.time() - start_time) * 1000  # ms
+            
+            is_up = response.status_code < 400
+            
+            # Store check result
+            conn = sqlite3.connect('monitoring.db')
+            c = conn.cursor()
+            c.execute('''
+                INSERT INTO service_checks 
+                (service_name, domain, timestamp, status_code, response_time, is_up, error_message)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                service["name"],
+                service["domain"],
+                datetime.now().isoformat(),
+                response.status_code,
+                response_time,
+                is_up,
+                None
+            ))
+            
+            # Update stats
+            c.execute('''
+                INSERT OR REPLACE INTO service_stats 
+                (service_name, total_checks, successful_checks, total_response_time, last_check, last_status)
+                VALUES (?, 
+                    COALESCE((SELECT total_checks FROM service_stats WHERE service_name = ?), 0) + 1,
+                    COALESCE((SELECT successful_checks FROM service_stats WHERE service_name = ?), 0) + ?,
+                    COALESCE((SELECT total_response_time FROM service_stats WHERE service_name = ?), 0) + ?,
+                    ?, ?
+                )
+            ''', (
+                service["name"],
+                service["name"],
+                service["name"], 1 if is_up else 0,
+                service["name"], response_time,
+                datetime.now().isoformat(),
+                is_up
+            ))
+            
+            conn.commit()
+            conn.close()
+            
+            return {
+                "service": service["name"],
+                "status": "up" if is_up else "down",
+                "status_code": response.status_code,
+                "response_time": response_time,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+    except Exception as e:
+        # Store failure
+        conn = sqlite3.connect('monitoring.db')
+        c = conn.cursor()
+        c.execute('''
+            INSERT INTO service_checks 
+            (service_name, domain, timestamp, status_code, response_time, is_up, error_message)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            service["name"],
+            service["domain"],
+            datetime.now().isoformat(),
+            None,
+            None,
+            False,
+            str(e)
+        ))
+        
+        # Update stats
+        c.execute('''
+            INSERT OR REPLACE INTO service_stats 
+            (service_name, total_checks, successful_checks, total_response_time, last_check, last_status)
+            VALUES (?, 
+                COALESCE((SELECT total_checks FROM service_stats WHERE service_name = ?), 0) + 1,
+                COALESCE((SELECT successful_checks FROM service_stats WHERE service_name = ?), 0) + 0,
+                COALESCE((SELECT total_response_time FROM service_stats WHERE service_name = ?), 0) + 0,
+                ?, ?
+            )
+        ''', (
+            service["name"],
+            service["name"],
+            service["name"],
+            service["name"],
+            datetime.now().isoformat(),
+            False
+        ))
+        
+        conn.commit()
+        conn.close()
+        
+        return {
+            "service": service["name"],
+            "status": "down",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+async def run_service_checks():
+    """Run checks for all monitored services"""
+    print(f"[{datetime.now()}] Running scheduled service checks...")
+    tasks = [check_single_service(service) for service in MONITORED_SERVICES]
+    results = await asyncio.gather(*tasks)
+    
+    # Log summary
+    up_count = sum(1 for r in results if r.get("status") == "up")
+    print(f"[{datetime.now()}] Check complete: {up_count}/{len(results)} services up")
+    return results
+
+async def schedule_checks():
+    """Setup scheduled checks"""
+    # Run immediately on startup
+    await run_service_checks()
+    
+    # Schedule every 5 minutes
+    aioschedule.every(5).minutes.do(lambda: asyncio.create_task(run_service_checks()))
+    
+    # Keep scheduler running
+    while True:
+        await aioschedule.run_pending()
+        await asyncio.sleep(1)
 
 # Simple in-memory rate limiter (per-IP, sliding window)
 RATE_LIMIT = 60  # requests
@@ -213,6 +395,156 @@ async def stream_nmap(host: str, top_ports: int = 100):
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
+# API endpoints for monitoring
+@app.get("/api/service/{service_name}/status")
+async def get_service_status(service_name: str):
+    """Get current status of a service"""
+    conn = sqlite3.connect('monitoring.db')
+    c = conn.cursor()
+    
+    # Get latest check
+    c.execute('''
+        SELECT timestamp, is_up, status_code, response_time, error_message
+        FROM service_checks 
+        WHERE service_name = ?
+        ORDER BY timestamp DESC
+        LIMIT 1
+    ''', (service_name,))
+    
+    latest = c.fetchone()
+    
+    if not latest:
+        conn.close()
+        return {"error": "No data available"}
+    
+    # Get stats
+    c.execute('''
+        SELECT total_checks, successful_checks, total_response_time, last_status
+        FROM service_stats 
+        WHERE service_name = ?
+    ''', (service_name,))
+    
+    stats = c.fetchone()
+    conn.close()
+    
+    timestamp, is_up, status_code, response_time, error_message = latest
+    
+    if stats:
+        total_checks, successful_checks, total_response_time, last_status = stats
+        uptime_percentage = (successful_checks / total_checks * 100) if total_checks > 0 else 0
+        avg_response_time = total_response_time / successful_checks if successful_checks > 0 else 0
+    else:
+        uptime_percentage = 0
+        avg_response_time = 0
+    
+    return {
+        "service": service_name,
+        "status": "up" if is_up else "down",
+        "is_up": is_up,
+        "status_code": status_code,
+        "response_time": response_time,
+        "timestamp": timestamp,
+        "uptime_percentage": round(uptime_percentage, 2),
+        "avg_response_time": round(avg_response_time, 2),
+        "error": error_message
+    }
+
+@app.get("/api/service/{service_name}/history")
+async def get_service_history(service_name: str, hours: int = 24):
+    """Get historical data for graphing"""
+    conn = sqlite3.connect('monitoring.db')
+    c = conn.cursor()
+    
+    cutoff = datetime.now() - timedelta(hours=hours)
+    
+    # Get hourly aggregated data
+    c.execute('''
+        SELECT 
+            strftime('%Y-%m-%d %H:00:00', timestamp) as hour,
+            COUNT(*) as total_checks,
+            SUM(CASE WHEN is_up = 1 THEN 1 ELSE 0 END) as up_checks,
+            AVG(CASE WHEN is_up = 1 THEN response_time ELSE NULL END) as avg_response_time
+        FROM service_checks 
+        WHERE service_name = ? AND timestamp >= ?
+        GROUP BY strftime('%Y-%m-%d %H:00:00', timestamp)
+        ORDER BY hour
+    ''', (service_name, cutoff.isoformat()))
+    
+    data = []
+    now = datetime.now()
+    
+    # Create data for last 24 hours
+    for hour_offset in range(24):
+        hour_time = now - timedelta(hours=hour_offset)
+        hour_key = hour_time.strftime('%Y-%m-%d %H:00:00')
+        
+        # Find matching data
+        matching_data = None
+        c.execute('''
+            SELECT hour, total_checks, up_checks, avg_response_time
+            FROM (
+                SELECT 
+                    strftime('%Y-%m-%d %H:00:00', timestamp) as hour,
+                    COUNT(*) as total_checks,
+                    SUM(CASE WHEN is_up = 1 THEN 1 ELSE 0 END) as up_checks,
+                    AVG(CASE WHEN is_up = 1 THEN response_time ELSE NULL END) as avg_response_time
+                FROM service_checks 
+                WHERE service_name = ? AND timestamp >= ?
+                GROUP BY strftime('%Y-%m-%d %H:00:00', timestamp)
+            ) WHERE hour = ?
+        ''', (service_name, cutoff.isoformat(), hour_key))
+        
+        row = c.fetchone()
+        
+        if row:
+            hour_str, total_checks, up_checks, avg_response_time = row
+            downtime_ratio = (total_checks - up_checks) / total_checks if total_checks > 0 else 0
+            downtime_minutes = downtime_ratio * 60
+        else:
+            downtime_minutes = 0
+            avg_response_time = 0
+            total_checks = 0
+        
+        data.insert(0, {
+            "hour": hour_time.hour,
+            "hour_display": hour_time.strftime('%I %p').lstrip('0'),
+            "downtime_minutes": round(downtime_minutes, 1),
+            "avg_response_time": round(avg_response_time or 0, 1),
+            "checks": total_checks,
+            "timestamp": hour_time.isoformat()
+        })
+    
+    conn.close()
+    
+    # Calculate overall stats
+    total_downtime = sum(item["downtime_minutes"] for item in data)
+    total_checks = sum(item["checks"] for item in data)
+    downtime_percentage = (total_downtime / (60 * len(data))) * 100 if len(data) > 0 else 0
+    
+    return {
+        "service": service_name,
+        "data": data,
+        "summary": {
+            "downtime_percentage": round(downtime_percentage, 2),
+            "total_downtime": round(total_downtime, 2),
+            "total_checks": total_checks,
+            "monitoring_period_hours": hours
+        }
+    }
+
+@app.get("/api/services/status")
+async def get_all_services_status():
+    """Get status of all monitored services"""
+    results = []
+    for service in MONITORED_SERVICES:
+        try:
+            status_data = await get_service_status(service["name"])
+            if "error" not in status_data:
+                results.append(status_data)
+        except:
+            continue
+    
+    return results
 
 # Load SPA template (dist build preferred, fallback to source index)
 TEMPLATE_PATHS = ["frontend/dist/index.html", "frontend/index.html"]
@@ -265,6 +597,14 @@ def render_index(route: str):
             "og_description": "Instantly check whether a website or server is up or down with our quick status tool.",
             "canonical": "https://isitdown.space/status",
         })
+    elif route == "monitor":  # Added for monitoring page
+        meta.update({
+            "title": "Service Monitor - Real-time Status Dashboard | Isitdown?",
+            "description": "Real-time monitoring dashboard for popular services. Track uptime, response times, and historical data for Instagram, YouTube, Twitter, Jio, Airtel, and more.",
+            "og_title": "Service Monitor - Real-time Status Dashboard",
+            "og_description": "Monitor popular services including social media, telecom providers, and banking services with real-time status updates and historical graphs.",
+            "canonical": "https://isitdown.space/monitor",
+        })
 
     # Simple replacements
     out = tpl
@@ -303,6 +643,14 @@ async def port_scan_page():
 async def status_page():
     return HTMLResponse(render_index("status"))
 
+@app.get("/monitor", response_class=HTMLResponse)  # Added monitoring page
+async def monitor_page():
+    return HTMLResponse(render_index("monitor"))
+
 # Serve built React frontend (vite build output) - mount last so API routes take precedence
 app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="static")
 
+@app.on_event("startup")
+async def startup_event():
+    """Start scheduled monitoring on app startup"""
+    asyncio.create_task(schedule_checks())
