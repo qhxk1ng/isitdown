@@ -78,6 +78,47 @@ export default function App() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
+  // Batch fetch statuses for all services to avoid per-card requests (reduce rate limit pressure)
+  const [servicesStatusMap, setServicesStatusMap] = useState({});
+  // safe fetch with automatic exponential backoff for 429 responses
+  async function safeFetch(input, init = {}, retries = 4, backoff = 600) {
+    for (let i = 0; i <= retries; i++) {
+      try {
+        const res = await fetch(input, init);
+        if (res.status !== 429) return res;
+        // 429 -> wait and retry
+        const wait = backoff * Math.pow(2, i);
+        await new Promise((r) => setTimeout(r, wait));
+        continue;
+      } catch (e) {
+        if (i === retries) throw e;
+        await new Promise((r) => setTimeout(r, backoff));
+      }
+    }
+    throw new Error("rate limited");
+  }
+  useEffect(() => {
+    let mounted = true;
+    async function loadAllStatuses() {
+      try {
+        const res = await safeFetch("/api/services/status");
+        if (!res.ok) return;
+        const arr = await res.json();
+        if (!mounted) return;
+        const map = {};
+        for (const s of arr) {
+          map[s.service] = s;
+        }
+        setServicesStatusMap(map);
+      } catch (e) {
+        console.debug("failed to load services status", e);
+      }
+    }
+    loadAllStatuses();
+    const iv = setInterval(loadAllStatuses, 30000);
+    return () => { mounted = false; clearInterval(iv); };
+  }, []);
+
   async function postJSON(path, body) {
     setLoading(true);
     setStatus(null);
@@ -88,7 +129,7 @@ export default function App() {
     const startTime = performance.now();
     
     try {
-      const res = await fetch(path, {
+        const res = await safeFetch(path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -199,26 +240,48 @@ export default function App() {
     return ports;
   }
 
-  function ServiceCard({ name, domain }) {
+  function ServiceCard({ name, domain, initialStatus }) {
     const [status, setStatus] = useState(null);
     const [loading, setLoading] = useState(false);
     const [historyData, setHistoryData] = useState([]);
     const [uptimePercentage, setUptimePercentage] = useState(0);
     const [avgResponseTime, setAvgResponseTime] = useState(0);
     const [lastChecked, setLastChecked] = useState(null);
+    const [showHistory, setShowHistory] = useState(false);
   
-    // Load service data on component mount
+    // Initialize from batch-loaded status if provided; otherwise fetch once on mount.
     useEffect(() => {
-      loadServiceData();
-      // Refresh every 30 seconds
-      const interval = setInterval(loadServiceData, 30000);
-      return () => clearInterval(interval);
-    }, []);
+      let mounted = true;
+      if (initialStatus) {
+        setStatus(initialStatus.is_up ? "up" : "down");
+        setUptimePercentage(initialStatus.uptime_percentage || 0);
+        setAvgResponseTime(initialStatus.avg_response_time || 0);
+        setLastChecked(initialStatus.timestamp || null);
+      } else {
+        // fetch status once if no initial status
+        (async () => {
+          try {
+            const res = await safeFetch(`/api/service/${encodeURIComponent(name)}/status`);
+            if (!res.ok) return;
+            const d = await res.json();
+            if (!mounted) return;
+            setStatus(d.is_up ? "up" : "down");
+            setUptimePercentage(d.uptime_percentage || 0);
+            setAvgResponseTime(d.avg_response_time || 0);
+            setLastChecked(d.timestamp || null);
+          } catch (e) {
+            console.debug("failed to fetch status", e);
+          }
+        })();
+      }
+      // Refresh visible status periodically from global map (App-level) via prop changes
+      return () => { mounted = false; };
+    }, [initialStatus, name]);
   
     const loadServiceData = async () => {
       try {
         // Get current status
-        const statusRes = await fetch(`/api/service/${encodeURIComponent(name)}/status`);
+        const statusRes = await safeFetch(`/api/service/${encodeURIComponent(name)}/status`);
         if (statusRes.ok) {
           const statusData = await statusRes.json();
           setStatus(statusData.is_up ? 'up' : 'down');
@@ -227,12 +290,7 @@ export default function App() {
           setLastChecked(statusData.timestamp);
         }
   
-        // Get historical data for graph
-        const historyRes = await fetch(`/api/service/${encodeURIComponent(name)}/history?hours=24`);
-        if (historyRes.ok) {
-          const historyData = await historyRes.json();
-          setHistoryData(historyData.data || []);
-        }
+        // (histories are loaded on demand when user expands 'Show history')
       } catch (error) {
         console.error("Failed to load service data:", error);
       }
@@ -241,7 +299,7 @@ export default function App() {
     const checkServiceNow = async () => {
       setLoading(true);
       try {
-        const res = await fetch("/api/http", {
+        const res = await safeFetch("/api/http", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
@@ -258,7 +316,21 @@ export default function App() {
           setStatus('down');
         }
         // Refresh data after manual check
-        setTimeout(loadServiceData, 1000);
+        setTimeout(() => {
+          // refresh status via parent batch fetch by triggering a global refetch - simple approach: call services endpoint
+          safeFetch("/api/services/status").then(r=>r.ok && r.json().then(arr=> {
+            const map = {};
+            for (const s of arr) map[s.service]=s;
+            // update local fields if this service present
+            if (map[name]) {
+              const s = map[name];
+              setStatus(s.is_up ? 'up' : 'down');
+              setUptimePercentage(s.uptime_percentage || 0);
+              setAvgResponseTime(s.avg_response_time || 0);
+              setLastChecked(s.timestamp || null);
+            }
+          })).catch(()=>{});
+        }, 1000);
       } catch (e) {
         setStatus('down');
       } finally {
@@ -307,68 +379,90 @@ export default function App() {
         
         <div className="downtime-graph">
           <div className="graph-title">24h Overview</div>
-          <div className="chart-container" style={{ height: 180 }}>
-            {historyData && historyData.length > 0 ? (
-              <Chart
-                type="bar"
-                data={{
-                  labels: historyData.map((h) => h.hour_display || h.hour),
-                  datasets: [
-                    {
-                      type: "bar",
-                      label: "Downtime (min)",
-                      data: historyData.map((h) => h.downtime_minutes || 0),
-                      yAxisID: "yDowntime",
-                      backgroundColor: historyData.map((h) => (h.downtime_minutes && h.downtime_minutes > 0 ? "#ef4444" : "#10b981")),
-                      borderRadius: 6,
-                      barPercentage: 0.7,
-                    },
-                    {
-                      type: "line",
-                      label: "Avg response (ms)",
-                      data: historyData.map((h) => h.avg_response_time || 0),
-                      yAxisID: "yResp",
-                      borderColor: "#60a5fa",
-                      backgroundColor: "rgba(96,165,250,0.12)",
-                      tension: 0.3,
-                      pointRadius: 3,
-                      pointHoverRadius: 5,
-                      order: 0,
-                    },
-                  ],
-                }}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: { position: "top", labels: { usePointStyle: true } },
-                    tooltip: { mode: "index", intersect: false },
-                    title: { display: false },
-                  },
-                  interaction: { mode: "index", intersect: false },
-                  scales: {
-                    x: { grid: { display: false } },
-                    yResp: {
-                      type: "linear",
-                      position: "left",
-                      grid: { color: "rgba(255,255,255,0.03)" },
-                      ticks: { color: "#cfe8ff" },
-                      title: { display: true, text: "ms", color: "#cfe8ff" },
-                    },
-                    yDowntime: {
-                      type: "linear",
-                      position: "right",
-                      grid: { drawOnChartArea: false },
-                      ticks: { color: "#cfe8ff" },
-                      title: { display: true, text: "min", color: "#cfe8ff" },
-                    },
-                  },
-                }}
-              />
-            ) : (
-              <div style={{ color: "var(--muted)", textAlign: "center", padding: 20 }}>No historical data</div>
-            )}
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <button onClick={async () => {
+              if (showHistory) { setShowHistory(false); return; }
+              // load history on demand
+              try {
+                setLoading(true);
+                const hres = await safeFetch(`/api/service/${encodeURIComponent(name)}/history?hours=24`);
+                if (hres.ok) {
+                  const json = await hres.json();
+                  setHistoryData(json.data || []);
+                }
+              } catch (e) {
+                console.debug("failed to load history", e);
+              } finally {
+                setLoading(false);
+                setShowHistory(true);
+              }
+            }}>{showHistory ? "Hide history" : "Show history"}</button>
+            <div style={{ color: "var(--muted)" }}>{uptimePercentage.toFixed(1)}% uptime · Avg {avgResponseTime.toFixed(0)}ms</div>
           </div>
+          {showHistory && (
+            <div className="chart-container" style={{ height: 180, marginTop: 12 }}>
+              {historyData && historyData.length > 0 ? (
+                <Chart
+                  type="bar"
+                  data={{
+                    labels: historyData.map((h) => h.hour_display || h.hour),
+                    datasets: [
+                      {
+                        type: "bar",
+                        label: "Downtime (min)",
+                        data: historyData.map((h) => h.downtime_minutes || 0),
+                        yAxisID: "yDowntime",
+                        backgroundColor: historyData.map((h) => (h.downtime_minutes && h.downtime_minutes > 0 ? "#ef4444" : "#10b981")),
+                        borderRadius: 6,
+                        barPercentage: 0.7,
+                      },
+                      {
+                        type: "line",
+                        label: "Avg response (ms)",
+                        data: historyData.map((h) => h.avg_response_time || 0),
+                        yAxisID: "yResp",
+                        borderColor: "#60a5fa",
+                        backgroundColor: "rgba(96,165,250,0.12)",
+                        tension: 0.3,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        order: 0,
+                      },
+                    ],
+                  }}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: { position: "top", labels: { usePointStyle: true } },
+                      tooltip: { mode: "index", intersect: false },
+                      title: { display: false },
+                    },
+                    interaction: { mode: "index", intersect: false },
+                    scales: {
+                      x: { grid: { display: false } },
+                      yResp: {
+                        type: "linear",
+                        position: "left",
+                        grid: { color: "rgba(255,255,255,0.03)" },
+                        ticks: { color: "#cfe8ff" },
+                        title: { display: true, text: "ms", color: "#cfe8ff" },
+                      },
+                      yDowntime: {
+                        type: "linear",
+                        position: "right",
+                        grid: { drawOnChartArea: false },
+                        ticks: { color: "#cfe8ff" },
+                        title: { display: true, text: "min", color: "#cfe8ff" },
+                      },
+                    },
+                  }}
+                />
+              ) : (
+                <div style={{ color: "var(--muted)", textAlign: "center", padding: 20 }}>No historical data</div>
+              )}
+            </div>
+          )}
         </div>
         
         {lastChecked && (
