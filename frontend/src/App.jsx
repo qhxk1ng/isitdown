@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import Nav from "./components/Nav";
-import logo from "./assets/logo.png";
 
 export default function App() {
   const [output, setOutput] = useState("Enter a URL or host to check status");
@@ -269,14 +268,9 @@ export default function App() {
     <div className="app">
       <header className="hero" role="banner">
         <div className="hero-inner">
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <img src={logo} alt="Isitdown logo" className="site-logo" />
-            <div>
-              <div className="brand-text">isitdown.space</div>
-              <div className="tag">Quick checks for websites, servers and services</div>
-            </div>
-          </div>
+          <h1 className="brand">isitdown.space</h1>
           <Nav active={activeTab} onChange={setActiveTab} />
+          <p className="tag">Quick checks for websites, servers and services</p>
         </div>
       </header>
 
