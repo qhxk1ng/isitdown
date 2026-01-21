@@ -1,5 +1,29 @@
 import React, { useState, useEffect, useRef } from "react";
 import Nav from "./components/Nav";
+// Chart.js for nicer graphs
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import { Chart } from "react-chartjs-2";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 export default function App() {
   const [output, setOutput] = useState("Enter a URL or host to check status");
@@ -175,33 +199,53 @@ export default function App() {
     return ports;
   }
 
-  function ServiceCard({ name, protocol, domain }) {
+  function ServiceCard({ name, domain }) {
     const [status, setStatus] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [downtimeData, setDowntimeData] = useState([]);
+    const [historyData, setHistoryData] = useState([]);
+    const [uptimePercentage, setUptimePercentage] = useState(0);
+    const [avgResponseTime, setAvgResponseTime] = useState(0);
+    const [lastChecked, setLastChecked] = useState(null);
   
-    // Generate random downtime data for the graph (simulated)
+    // Load service data on component mount
     useEffect(() => {
-      const data = [];
-      for (let i = 0; i < 24; i++) {
-        data.push({
-          hour: i,
-          downtime: Math.random() > 0.7 ? Math.random() * 60 : 0 // 30% chance of downtime
-        });
-      }
-      setDowntimeData(data);
+      loadServiceData();
+      // Refresh every 30 seconds
+      const interval = setInterval(loadServiceData, 30000);
+      return () => clearInterval(interval);
     }, []);
   
-    const checkService = async () => {
+    const loadServiceData = async () => {
+      try {
+        // Get current status
+        const statusRes = await fetch(`/api/service/${encodeURIComponent(name)}/status`);
+        if (statusRes.ok) {
+          const statusData = await statusRes.json();
+          setStatus(statusData.is_up ? 'up' : 'down');
+          setUptimePercentage(statusData.uptime_percentage || 0);
+          setAvgResponseTime(statusData.avg_response_time || 0);
+          setLastChecked(statusData.timestamp);
+        }
+  
+        // Get historical data for graph
+        const historyRes = await fetch(`/api/service/${encodeURIComponent(name)}/history?hours=24`);
+        if (historyRes.ok) {
+          const historyData = await historyRes.json();
+          setHistoryData(historyData.data || []);
+        }
+      } catch (error) {
+        console.error("Failed to load service data:", error);
+      }
+    };
+  
+    const checkServiceNow = async () => {
       setLoading(true);
-      setStatus(null);
-      
       try {
         const res = await fetch("/api/http", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
-            url: `${protocol}://${domain}`, 
+            url: `https://${domain}`, 
             timeout: 5, 
             verbose: false 
           }),
@@ -213,6 +257,8 @@ export default function App() {
         } else {
           setStatus('down');
         }
+        // Refresh data after manual check
+        setTimeout(loadServiceData, 1000);
       } catch (e) {
         setStatus('down');
       } finally {
@@ -220,12 +266,14 @@ export default function App() {
       }
     };
   
-    // Calculate downtime percentage
-    const downtimePercentage = downtimeData.reduce((sum, point) => sum + point.downtime, 0) / (60 * 24) * 100;
+    // Find max downtime for scaling graph
+    const maxDowntime = historyData.length > 0 
+      ? Math.max(...historyData.map(d => d.downtime_minutes), 1) 
+      : 1;
   
     return (
-      <div className={`service-card ${status || 'idle'}`}>
-        <div className="service-header" onClick={checkService}>
+      <div className={`service-card ${status || 'idle'}`} onClick={checkServiceNow}>
+        <div className="service-header">
           <div className="service-icon">
             {loading ? (
               <div className="service-loading"></div>
@@ -241,37 +289,93 @@ export default function App() {
             <div className="service-name">{name}</div>
             <div className="service-domain">{domain}</div>
             <div className="service-status">
-              {loading ? 'Checking...' : status === 'up' ? '✓ Online' : status === 'down' ? '✗ Offline' : 'Click to check'}
+              {loading ? 'Checking...' : status === 'up' ? '✓ Online' : status === 'down' ? '✗ Offline' : 'Loading...'}
             </div>
           </div>
         </div>
         
-        <div className="downtime-graph">
-          <div className="graph-header">
-            <span>24h Downtime</span>
-            <span className="downtime-percentage">{downtimePercentage.toFixed(1)}%</span>
+        <div className="service-metrics">
+          <div className="metric-row">
+            <span className="metric-label">Uptime</span>
+            <span className="metric-value">{uptimePercentage.toFixed(1)}%</span>
           </div>
-          <div className="graph-bars">
-            {downtimeData.map((point, index) => (
-              <div 
-                key={index} 
-                className="graph-bar" 
-                style={{ 
-                  height: `${(point.downtime / 60) * 100}%`,
-                  backgroundColor: point.downtime > 0 ? '#ef4444' : '#10b981'
-                }}
-                title={`Hour ${point.hour}: ${point.downtime > 0 ? `${point.downtime.toFixed(0)}min downtime` : 'No downtime'}`}
-              />
-            ))}
-          </div>
-          <div className="graph-labels">
-            <span>12am</span>
-            <span>6am</span>
-            <span>12pm</span>
-            <span>6pm</span>
-            <span>12am</span>
+          <div className="metric-row">
+            <span className="metric-label">Avg Response</span>
+            <span className="metric-value">{avgResponseTime.toFixed(0)}ms</span>
           </div>
         </div>
+        
+        <div className="downtime-graph">
+          <div className="graph-title">24h Overview</div>
+          <div className="chart-container" style={{ height: 180 }}>
+            {historyData && historyData.length > 0 ? (
+              <Chart
+                type="bar"
+                data={{
+                  labels: historyData.map((h) => h.hour_display || h.hour),
+                  datasets: [
+                    {
+                      type: "bar",
+                      label: "Downtime (min)",
+                      data: historyData.map((h) => h.downtime_minutes || 0),
+                      yAxisID: "yDowntime",
+                      backgroundColor: historyData.map((h) => (h.downtime_minutes && h.downtime_minutes > 0 ? "#ef4444" : "#10b981")),
+                      borderRadius: 6,
+                      barPercentage: 0.7,
+                    },
+                    {
+                      type: "line",
+                      label: "Avg response (ms)",
+                      data: historyData.map((h) => h.avg_response_time || 0),
+                      yAxisID: "yResp",
+                      borderColor: "#60a5fa",
+                      backgroundColor: "rgba(96,165,250,0.12)",
+                      tension: 0.3,
+                      pointRadius: 3,
+                      pointHoverRadius: 5,
+                      order: 0,
+                    },
+                  ],
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: { position: "top", labels: { usePointStyle: true } },
+                    tooltip: { mode: "index", intersect: false },
+                    title: { display: false },
+                  },
+                  interaction: { mode: "index", intersect: false },
+                  scales: {
+                    x: { grid: { display: false } },
+                    yResp: {
+                      type: "linear",
+                      position: "left",
+                      grid: { color: "rgba(255,255,255,0.03)" },
+                      ticks: { color: "#cfe8ff" },
+                      title: { display: true, text: "ms", color: "#cfe8ff" },
+                    },
+                    yDowntime: {
+                      type: "linear",
+                      position: "right",
+                      grid: { drawOnChartArea: false },
+                      ticks: { color: "#cfe8ff" },
+                      title: { display: true, text: "min", color: "#cfe8ff" },
+                    },
+                  },
+                }}
+              />
+            ) : (
+              <div style={{ color: "var(--muted)", textAlign: "center", padding: 20 }}>No historical data</div>
+            )}
+          </div>
+        </div>
+        
+        {lastChecked && (
+          <div className="last-checked">
+            Last checked: {new Date(lastChecked).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+          </div>
+        )}
       </div>
     );
   }
