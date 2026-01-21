@@ -12,6 +12,7 @@ import sqlite3
 from datetime import datetime, timedelta
 from typing import Optional
 import aioschedule
+import os
 
 app = FastAPI(title="Isitdown? API")  # Changed from "isitdown.space API"
 
@@ -194,21 +195,101 @@ async def schedule_checks():
         await aioschedule.run_pending()
         await asyncio.sleep(1)
 
-# Simple in-memory rate limiter (per-IP, sliding window)
-RATE_LIMIT = 60  # requests
+# Simple in-memory rate limiter (per-IP, sliding window) - kept as fallback
+RATE_LIMIT = int(os.getenv("RATE_LIMIT_PER_MIN", "120"))  # tokens per minute
 RATE_PERIOD = 60  # seconds
 _clients = {}
 
 def client_allowed(ip: str) -> bool:
+    """Fallback in-memory sliding window limiter"""
     now = time.time()
     q = _clients.setdefault(ip, [])
-    # drop old
     while q and q[0] <= now - RATE_PERIOD:
         q.pop(0)
     if len(q) >= RATE_LIMIT:
         return False
     q.append(now)
     return True
+
+# Redis-backed token-bucket limiter (preferred)
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+_redis = None
+
+try:
+    import redis.asyncio as redis  # type: ignore
+except Exception:
+    redis = None
+
+TOKEN_BUCKET_LUA = r"""
+local key=KEYS[1]
+local capacity=tonumber(ARGV[1])
+local refill_per_ms=tonumber(ARGV[2])
+local now=tonumber(ARGV[3])
+local requested=tonumber(ARGV[4])
+local data=redis.call('HMGET', key, 'tokens', 'ts')
+local tokens=data[1]
+local ts=data[2]
+if tokens==false or tokens==nil then
+  tokens=capacity
+  ts=now
+else
+  tokens=tonumber(tokens)
+  ts=tonumber(ts)
+end
+local delta = math.max(0, now - ts)
+local refill = delta * refill_per_ms
+tokens = math.min(capacity, tokens + refill)
+if tokens < requested then
+  redis.call('HMSET', key, 'tokens', tokens, 'ts', now)
+  redis.call('PEXPIRE', key, 60000)
+  return 0
+else
+  tokens = tokens - requested
+  redis.call('HMSET', key, 'tokens', tokens, 'ts', now)
+  redis.call('PEXPIRE', key, 60000)
+  return 1
+end
+"""
+
+async def redis_allow(ip: str, capacity: int = None, per_min: int = None) -> bool:
+    """Use Redis token bucket to decide if request is allowed. Returns True if allowed."""
+    global _redis
+    if redis is None or _redis is None:
+        return True
+    try:
+        cap = capacity or RATE_LIMIT
+        per_min = per_min or RATE_LIMIT
+        refill_per_ms = float(per_min) / 60.0 / 1000.0
+        now_ms = int(time.time() * 1000)
+        key = f"rl:{ip}"
+        allowed = await _redis.eval(TOKEN_BUCKET_LUA, 1, key, cap, refill_per_ms, now_ms, 1)
+        return bool(int(allowed))
+    except Exception:
+        return True
+
+
+@app.on_event("startup")
+async def startup_redis():
+    global _redis
+    if redis is None:
+        _redis = None
+        return
+    try:
+        _redis = redis.from_url(REDIS_URL)
+        await _redis.ping()
+    except Exception:
+        _redis = None
+
+
+@app.on_event("shutdown")
+async def shutdown_redis():
+    global _redis
+    if _redis:
+        try:
+            await _redis.close()
+        except Exception:
+            pass
+        _redis = None
 
 def is_private_host(host: str) -> bool:
     try:
@@ -225,8 +306,17 @@ def is_private_host(host: str) -> bool:
 @app.middleware("http")
 async def ip_rate_limit(request: Request, call_next):
     client = request.client.host or "unknown"
-    if not client_allowed(client):
+    # Try Redis-backed limiter first
+    try:
+        allowed = await redis_allow(client)
+    except Exception:
+        allowed = True
+    if not allowed:
         return JSONResponse({"error": "rate limit exceeded"}, status_code=429)
+    # If Redis unavailable, fallback to in-memory limiter
+    if _redis is None:
+        if not client_allowed(client):
+            return JSONResponse({"error": "rate limit exceeded"}, status_code=429)
     return await call_next(request)
 
 @app.post("/api/http")
