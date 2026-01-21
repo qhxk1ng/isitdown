@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import asyncio
 import httpx
@@ -160,11 +160,6 @@ async def run_nmap(payload: dict):
     err = proc.stderr or ""
     return {"cmd": cmd, "stdout": out, "stderr": err, "returncode": proc.returncode}
 
-# Serve built React frontend (vite build output)
-# Serve static files for GET requests only so API POSTs are routed to FastAPI endpoints.
-app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="static")
-
-
 @app.get("/api/nmap/stream")
 async def stream_nmap(host: str, top_ports: int = 100):
     """
@@ -217,4 +212,97 @@ async def stream_nmap(host: str, top_ports: int = 100):
             yield f"data: __ERROR__ {str(e)}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+# Load SPA template (dist build preferred, fallback to source index)
+TEMPLATE_PATHS = ["frontend/dist/index.html", "frontend/index.html"]
+_TEMPLATE_CONTENT = None
+
+def load_template():
+    global _TEMPLATE_CONTENT
+    if _TEMPLATE_CONTENT is not None:
+        return _TEMPLATE_CONTENT
+    for p in TEMPLATE_PATHS:
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                _TEMPLATE_CONTENT = f.read()
+                return _TEMPLATE_CONTENT
+        except FileNotFoundError:
+            continue
+    raise RuntimeError("index.html template not found in frontend/dist or frontend/")
+
+def render_index(route: str):
+    tpl = load_template()
+    # defaults
+    meta = {
+        "title": "Isitdown? - Free Online Service Checker, Port Scanner & HTTP Tester",
+        "description": "Free online website checker, port scanner, HTTP tester, and service monitor. Check if websites are down, scan ports with online nmap, test APIs with curl-like tool. No installation required.",
+        "og_title": "Isitdown? - Free Online Service Checker & Port Scanner",
+        "og_description": "Check if websites are down, scan ports with online nmap tool, test HTTP requests with curl-like interface. Free and easy to use.",
+        "canonical": "https://isitdown.space/",
+    }
+    if route == "curl":
+        meta.update({
+            "title": "Curl - Online HTTP tester | Isitdown?",
+            "description": "Online curl tool: send HTTP requests, set headers, and inspect responses. A lightweight curl-like interface in the browser.",
+            "og_title": "Curl - Online HTTP tester",
+            "og_description": "Use the online curl tester to send GET/POST requests, inspect headers and responses. No install required.",
+            "canonical": "https://isitdown.space/curl",
+        })
+    elif route == "port-scan":
+        meta.update({
+            "title": "Port Scan - Online Nmap & Port Scanner | Isitdown?",
+            "description": "Online port scanner using TCP-connect scans. Check open ports and services on hosts quickly and safely.",
+            "og_title": "Port Scan - Online Nmap",
+            "og_description": "Run restricted TCP connect port scans (no OS detection) to discover open services.",
+            "canonical": "https://isitdown.space/port-scan",
+        })
+    elif route == "status":
+        meta.update({
+            "title": "Status Checker - Is my site down? | Isitdown?",
+            "description": "Quick website status checker: test HTTP endpoints and ports to see if your site or server is up.",
+            "og_title": "Status Checker - Website status",
+            "og_description": "Instantly check whether a website or server is up or down with our quick status tool.",
+            "canonical": "https://isitdown.space/status",
+        })
+
+    # Simple replacements
+    out = tpl
+    out = out.replace(
+        "<title>Isitdown? - Free Online Service Checker, Port Scanner & HTTP Tester</title>",
+        f"<title>{meta['title']}</title>",
+    )
+    out = out.replace(
+        '<meta name="description" content="Free online website checker, port scanner, HTTP tester, and service monitor. Check if websites are down, scan ports with online nmap, test APIs with curl-like tool. No installation required.">',
+        f'<meta name="description" content="{meta["description"]}">',
+    )
+    out = out.replace(
+        '<meta property="og:title" content="Isitdown? - Free Online Service Checker & Port Scanner">',
+        f'<meta property="og:title" content="{meta["og_title"]}">',
+    )
+    out = out.replace(
+        '<meta property="og:description" content="Check if websites are down, scan ports with online nmap tool, test HTTP requests with curl-like interface. Free and easy to use.">',
+        f'<meta property="og:description" content="{meta["og_description"]}">',
+    )
+    out = out.replace(
+        '<link rel="canonical" href="https://isitdown.space/">',
+        f'<link rel="canonical" href="{meta["canonical"]}">',
+    )
+    return out
+
+# SEO-friendly routes with per-route meta injection
+@app.get("/curl", response_class=HTMLResponse)
+async def curl_page():
+    return HTMLResponse(render_index("curl"))
+
+@app.get("/port-scan", response_class=HTMLResponse)
+async def port_scan_page():
+    return HTMLResponse(render_index("port-scan"))
+
+@app.get("/status", response_class=HTMLResponse)
+async def status_page():
+    return HTMLResponse(render_index("status"))
+
+# Serve built React frontend (vite build output) - mount last so API routes take precedence
+app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="static")
 

@@ -5,7 +5,14 @@ export default function App() {
   const [output, setOutput] = useState("Enter a URL or host to check status");
   const [target, setTarget] = useState("");
   const [verbose, setVerbose] = useState(false);
-  const [activeTab, setActiveTab] = useState("isitdown");
+  function mapPathToTab(path) {
+    if (!path) return "isitdown";
+    if (path.startsWith("/port-scan")) return "scanner";
+    if (path.startsWith("/curl")) return "curl";
+    if (path.startsWith("/status")) return "isitdown";
+    return "home";
+  }
+  const [activeTab, setActiveTab] = useState(mapPathToTab(window.location.pathname));
   const [curlMethod, setCurlMethod] = useState("GET");
   const [curlHeaders, setCurlHeaders] = useState("");
   const [topPorts, setTopPorts] = useState(100);
@@ -37,6 +44,15 @@ export default function App() {
     }
     setStreaming(false);
   }, [activeTab]);
+
+  // listen for back/forward navigation and update active tab
+  useEffect(() => {
+    const onPop = () => {
+      setActiveTab(mapPathToTab(window.location.pathname));
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   async function postJSON(path, body) {
     setLoading(true);
