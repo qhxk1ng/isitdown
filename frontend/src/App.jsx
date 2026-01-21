@@ -178,6 +178,19 @@ export default function App() {
   function ServiceCard({ name, protocol, domain }) {
     const [status, setStatus] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [downtimeData, setDowntimeData] = useState([]);
+  
+    // Generate random downtime data for the graph (simulated)
+    useEffect(() => {
+      const data = [];
+      for (let i = 0; i < 24; i++) {
+        data.push({
+          hour: i,
+          downtime: Math.random() > 0.7 ? Math.random() * 60 : 0 // 30% chance of downtime
+        });
+      }
+      setDowntimeData(data);
+    }, []);
   
     const checkService = async () => {
       setLoading(true);
@@ -189,7 +202,7 @@ export default function App() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
             url: `${protocol}://${domain}`, 
-            timeout: 10, 
+            timeout: 5, 
             verbose: false 
           }),
         });
@@ -207,34 +220,58 @@ export default function App() {
       }
     };
   
+    // Calculate downtime percentage
+    const downtimePercentage = downtimeData.reduce((sum, point) => sum + point.downtime, 0) / (60 * 24) * 100;
+  
     return (
-      <div className={`service-card ${status}`} onClick={checkService}>
-        <div className="service-icon">
-          {loading ? (
-            <div className="service-loading"></div>
-          ) : status === 'up' ? (
-            <span className="status-dot up"></span>
-          ) : status === 'down' ? (
-            <span className="status-dot down"></span>
-          ) : (
-            <span className="status-dot idle"></span>
-          )}
+      <div className={`service-card ${status || 'idle'}`}>
+        <div className="service-header" onClick={checkService}>
+          <div className="service-icon">
+            {loading ? (
+              <div className="service-loading"></div>
+            ) : status === 'up' ? (
+              <span className="status-dot up"></span>
+            ) : status === 'down' ? (
+              <span className="status-dot down"></span>
+            ) : (
+              <span className="status-dot idle"></span>
+            )}
+          </div>
+          <div className="service-info">
+            <div className="service-name">{name}</div>
+            <div className="service-domain">{domain}</div>
+            <div className="service-status">
+              {loading ? 'Checking...' : status === 'up' ? '✓ Online' : status === 'down' ? '✗ Offline' : 'Click to check'}
+            </div>
+          </div>
         </div>
-        <div className="service-info">
-          <div className="service-name">{name}</div>
-          <div className="service-domain">{domain}</div>
+        
+        <div className="downtime-graph">
+          <div className="graph-header">
+            <span>24h Downtime</span>
+            <span className="downtime-percentage">{downtimePercentage.toFixed(1)}%</span>
+          </div>
+          <div className="graph-bars">
+            {downtimeData.map((point, index) => (
+              <div 
+                key={index} 
+                className="graph-bar" 
+                style={{ 
+                  height: `${(point.downtime / 60) * 100}%`,
+                  backgroundColor: point.downtime > 0 ? '#ef4444' : '#10b981'
+                }}
+                title={`Hour ${point.hour}: ${point.downtime > 0 ? `${point.downtime.toFixed(0)}min downtime` : 'No downtime'}`}
+              />
+            ))}
+          </div>
+          <div className="graph-labels">
+            <span>12am</span>
+            <span>6am</span>
+            <span>12pm</span>
+            <span>6pm</span>
+            <span>12am</span>
+          </div>
         </div>
-        <button 
-          className="service-check-btn" 
-          onClick={(e) => {
-            e.stopPropagation();
-            checkService();
-          }}
-          disabled={loading}
-          aria-label={`Check ${name} status`}
-        >
-          {loading ? 'Checking...' : 'Check'}
-        </button>
       </div>
     );
   }
@@ -661,25 +698,22 @@ export default function App() {
       </main>
 
     
-
-<section className="popular-services">
+      <section className="popular-services">
   <h3>Popular Services Quick Check</h3>
   <div className="services-grid">
-    {/* Social Media */}
+    {/* Row 1 */}
     <ServiceCard name="Instagram" protocol="https" domain="instagram.com" />
     <ServiceCard name="YouTube" protocol="https" domain="youtube.com" />
     <ServiceCard name="X (Twitter)" protocol="https" domain="twitter.com" />
     
-    {/* Telecom */}
+    {/* Row 2 */}
     <ServiceCard name="Jio" protocol="https" domain="jio.com" />
     <ServiceCard name="Airtel" protocol="https" domain="airtel.in" />
     <ServiceCard name="VI Vodafone Idea" protocol="https" domain="myvi.in" />
     
-    {/* Banking & Finance */}
+    {/* Row 3 */}
     <ServiceCard name="SBI" protocol="https" domain="onlinesbi.sbi" />
     <ServiceCard name="UPI" protocol="https" domain="upi.org.in" />
-    
-    {/* AI & Tech */}
     <ServiceCard name="OpenAI" protocol="https" domain="openai.com" />
   </div>
 </section>
